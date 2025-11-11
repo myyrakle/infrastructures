@@ -1,0 +1,875 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "ECS Web Server.",
+  "Metadata": {},
+  "Parameters": {
+    "ServerName": {
+      "Type": "String",
+      "Description": "The name of the server machine you want to create.",
+      "AllowedPattern": "(?!-)[a-zA-Z0-9-.]{1,63}(?<!-)",
+      "ConstraintDescription": "다른 시스템과 이름이 중복되지 않아야 합니다."
+    },
+    "GithubRepository": {
+      "Type": "String",
+      "Description": "The Name of the github repository you want to deploy. (e.g: nestjs)",
+      "ConstraintDescription": ""
+    },
+    "GithubBranch": {
+      "Type": "String",
+      "Description": "github branch (e.g: main)",
+      "ConstraintDescription": ""
+    },
+    "GithubUser": {
+      "Type": "String",
+      "Description": "github user name (e.g: myyrakle)"
+    },
+    "GithubToken": {
+      "Type": "String",
+      "Description": "Github Public Access Token. (e.g: ghp_KZymx3mI6f3x*****5GN3W5RItAB1fzlyi)"
+    },
+    "VPC": {
+      "Type": "String",
+      "Description": "VPC ID. That VPC must have at least 2 subnets for availability. (e.g: vpc-053f9aaabecf3b6bc)"
+    },
+    "Subnet1": {
+      "Type": "String",
+      "Description": "VPC subnet 1 for the load balancer. (e.g: subnet-0a2d62226d7faedea)"
+    },
+    "Subnet2": {
+      "Type": "String",
+      "Description": "VPC subnet 2 for the load balancer. (e.g: subnet-07d841fa02e302261)"
+    },
+    "CertificateArn": {
+      "Type": "String",
+      "Description": "ACM Arn for SSL (e.g: arn:aws:acm:ap-northeast-2:210706881319:certificate/6a0b3a8b-bcb1-491d-a814-078739105983)"
+    },
+    "EntryPoint": {
+      "Type": "CommaDelimitedList",
+      "Description": "Docker Run Entrypoint (e.g: \"sh\", \"run.sh\")"
+    },
+    "HealthCheckPath": {
+      "Type": "String",
+      "Description": "Health Check API Path (e.g: \"/api/health\")"
+    },
+    "BuildSpecPath": {
+      "Type": "String",
+      "Description": "BuildSpec file path (e.g: \"/prod/buildspec.yml\")"
+    }
+  },
+  "Rules": {},
+  "Mappings": {},
+  "Conditions": {},
+  "Resources": {
+    "CloudwatchLogsGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Join": [
+            "-",
+            [
+              "ECSLogGroup",
+              {
+                "Ref": "AWS::StackName"
+              }
+            ]
+          ]
+        },
+        "RetentionInDays": 14
+      }
+    },
+    "ECR": {
+      "Type": "AWS::ECR::Repository",
+      "Description": "ECR 공간 생성",
+      "Properties": {
+        "RepositoryName": {
+          "Ref": "ServerName"
+        }
+      }
+    },
+    "ECSCluster": {
+      "Type": "AWS::ECS::Cluster",
+      "Properties": {
+        "ClusterName": {
+          "Ref": "ServerName"
+        }
+      }
+    },
+    "TaskExecutionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": ["ecs-tasks.amazonaws.com"]
+              },
+              "Action": ["sts:AssumeRole"]
+            }
+          ]
+        },
+        "Path": "/",
+        "Policies": [
+          {
+            "PolicyName": "root",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": "*",
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "TaskDefinition": {
+      "Type": "AWS::ECS::TaskDefinition",
+      "Properties": {
+        "Family": {
+          "Ref": "ServerName"
+        },
+        "RequiresCompatibilities": ["FARGATE"],
+        "NetworkMode": "awsvpc",
+        "ExecutionRoleArn": {
+          "Ref": "TaskExecutionRole"
+        },
+        "ContainerDefinitions": [
+          {
+            "Name": {
+              "Ref": "ServerName"
+            },
+            "Cpu": "0",
+            "Essential": "true",
+            "Image": {
+              "Fn::Join": [
+                ":",
+                [
+                  {
+                    "Fn::GetAtt": ["ECR", "RepositoryUri"]
+                  },
+                  "release"
+                ]
+              ]
+            },
+            "LogConfiguration": {
+              "LogDriver": "awslogs",
+              "Options": {
+                "awslogs-group": {
+                  "Ref": "CloudwatchLogsGroup"
+                },
+                "awslogs-region": {
+                  "Ref": "AWS::Region"
+                },
+                "awslogs-stream-prefix": {
+                  "Ref": "ServerName"
+                }
+              }
+            },
+            "PortMappings": [
+              {
+                "ContainerPort": 80,
+                "HostPort": 80
+              }
+            ],
+            "EntryPoint": {
+              "Ref": "EntryPoint"
+            }
+          }
+        ],
+        "Memory": 2048,
+        "Cpu": 1024
+      }
+    },
+    "TargetGroup": {
+      "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+      "Properties": {
+        "HealthCheckEnabled": true,
+        "HealthCheckIntervalSeconds": 30,
+        "HealthCheckPath": {
+          "Ref": "HealthCheckPath"
+        },
+        "HealthCheckPort": "80",
+        "HealthCheckProtocol": "HTTP",
+        "HealthCheckTimeoutSeconds": 20,
+        "HealthyThresholdCount": 5,
+        "Name": {
+          "Ref": "ServerName"
+        },
+        "Port": "80",
+        "Protocol": "HTTP",
+        "TargetType": "ip",
+        "UnhealthyThresholdCount": 2,
+        "VpcId": {
+          "Ref": "VPC"
+        }
+      }
+    },
+    "ScalableTargetRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": ["application-autoscaling.amazonaws.com"]
+              },
+              "Action": ["sts:AssumeRole"]
+            }
+          ]
+        },
+        "Path": "/",
+        "Policies": [
+          {
+            "PolicyName": "root",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "application-autoscaling:*",
+                    "cloudwatch:DescribeAlarms",
+                    "cloudwatch:PutMetricAlarm",
+                    "ecs:DescribeServices",
+                    "ecs:UpdateService"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "DependsOn": ["ECSService"]
+    },
+    "ScalableTarget": {
+      "Type": "AWS::ApplicationAutoScaling::ScalableTarget",
+      "Properties": {
+        "MaxCapacity": 10,
+        "MinCapacity": 1,
+        "ResourceId": {
+          "Fn::Sub": "service/${ServerName}/${ServerName}"
+        },
+        "RoleARN": { "Fn::GetAtt": ["ScalableTargetRole", "Arn"] },
+        "ServiceNamespace": "ecs",
+        "ScalableDimension": "ecs:service:DesiredCount"
+      },
+      "DependsOn": ["ECSService", "ScalableTargetRole"]
+    },
+    "CPUScalingPolicy": {
+      "Type": "AWS::ApplicationAutoScaling::ScalingPolicy",
+      "Properties": {
+        "PolicyName": {
+          "Fn::Join": ["-", [{ "Ref": "ServerName" }, "cpu-auto-scaling"]]
+        },
+        "PolicyType": "TargetTrackingScaling",
+        "ScalingTargetId": { "Ref": "ScalableTarget" },
+        "ServiceNamespace": "ecs",
+        "ScalableDimension": "ecs:service:DesiredCount",
+        "TargetTrackingScalingPolicyConfiguration": {
+          "PredefinedMetricSpecification": {
+            "PredefinedMetricType": "ECSServiceAverageCPUUtilization"
+          },
+          "TargetValue": 70.0,
+          "ScaleOutCooldown": 300,
+          "ScaleInCooldown": 300,
+          "DisableScaleIn": false
+        }
+      },
+      "DependsOn": ["ScalableTarget"]
+    },
+    "MemoryScalingPolicy": {
+      "Type": "AWS::ApplicationAutoScaling::ScalingPolicy",
+      "Properties": {
+        "PolicyName": {
+          "Fn::Join": ["-", [{ "Ref": "ServerName" }, "memory-auto-scaling"]]
+        },
+        "PolicyType": "TargetTrackingScaling",
+        "ScalingTargetId": { "Ref": "ScalableTarget" },
+        "ServiceNamespace": "ecs",
+        "ScalableDimension": "ecs:service:DesiredCount",
+        "TargetTrackingScalingPolicyConfiguration": {
+          "PredefinedMetricSpecification": {
+            "PredefinedMetricType": "ECSServiceAverageMemoryUtilization"
+          },
+          "TargetValue": 70.0,
+          "ScaleOutCooldown": 300,
+          "ScaleInCooldown": 300,
+          "DisableScaleIn": false
+        }
+      },
+      "DependsOn": ["ScalableTarget"]
+    },
+    "LoadbalancerSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": {
+          "Fn::Join": [
+            " ",
+            [
+              {
+                "Ref": "ServerName"
+              },
+              "lb"
+            ]
+          ]
+        },
+        "GroupName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "ServerName"
+              },
+              "lb"
+            ]
+          ]
+        },
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "IpProtocol": "-1"
+          }
+        ],
+        "Tags": [],
+        "VpcId": {
+          "Ref": "VPC"
+        }
+      }
+    },
+    "LoadBalancer": {
+      "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+      "Properties": {
+        "Name": {
+          "Ref": "ServerName"
+        },
+        "SubnetMappings": [
+          {
+            "SubnetId": {
+              "Ref": "Subnet1"
+            }
+          },
+          {
+            "SubnetId": {
+              "Ref": "Subnet2"
+            }
+          }
+        ],
+        "SecurityGroups": [
+          {
+            "Ref": "LoadbalancerSecurityGroup"
+          }
+        ],
+        "Tags": [],
+        "Type": "application"
+      }
+    },
+    "LoadBalancerListner": {
+      "Type": "AWS::ElasticLoadBalancingV2::Listener",
+      "Properties": {
+        "DefaultActions": [
+          {
+            "Type": "forward",
+            "TargetGroupArn": {
+              "Ref": "TargetGroup"
+            }
+          }
+        ],
+        "LoadBalancerArn": {
+          "Ref": "LoadBalancer"
+        },
+        "Port": "80",
+        "Protocol": "HTTP"
+      },
+      "DependsOn": ["LoadBalancer"]
+    },
+    "LoadBalancerListnerSSL": {
+      "Type": "AWS::ElasticLoadBalancingV2::Listener",
+      "Properties": {
+        "DefaultActions": [
+          {
+            "Type": "forward",
+            "TargetGroupArn": {
+              "Ref": "TargetGroup"
+            }
+          }
+        ],
+        "LoadBalancerArn": {
+          "Ref": "LoadBalancer"
+        },
+        "Port": "443",
+        "Protocol": "HTTPS",
+        "Certificates": [
+          {
+            "CertificateArn": {
+              "Ref": "CertificateArn"
+            }
+          }
+        ]
+      },
+      "DependsOn": ["LoadBalancer"]
+    },
+    "ECSServiceRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": ["ecs.amazonaws.com"]
+              },
+              "Action": ["sts:AssumeRole"]
+            }
+          ]
+        },
+        "Path": "/",
+        "Policies": [
+          {
+            "PolicyName": "ecs-service",
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "elasticloadbalancing:DeregisterInstancesFromLoadBalancer",
+                    "elasticloadbalancing:DeregisterTargets",
+                    "elasticloadbalancing:Describe*",
+                    "elasticloadbalancing:RegisterInstancesWithLoadBalancer",
+                    "elasticloadbalancing:RegisterTargets",
+                    "ec2:Describe*",
+                    "ec2:AuthorizeSecurityGroupIngress"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "ECSServicesSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": {
+          "Fn::Join": [
+            " ",
+            [
+              {
+                "Ref": "ServerName"
+              },
+              "ecs-service"
+            ]
+          ]
+        },
+        "GroupName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "ServerName"
+              },
+              "ecs-service"
+            ]
+          ]
+        },
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "ToPort": 65535,
+            "FromPort": 0,
+            "IpProtocol": "tcp"
+          }
+        ],
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "FromPort": 3000,
+            "IpProtocol": "tcp",
+            "ToPort": 3000
+          },
+          {
+            "CidrIp": "0.0.0.0/0",
+            "FromPort": 80,
+            "IpProtocol": "tcp",
+            "ToPort": 80
+          }
+        ],
+        "Tags": [],
+        "VpcId": {
+          "Ref": "VPC"
+        }
+      }
+    },
+    "ECSService": {
+      "Type": "AWS::ECS::Service",
+      "Properties": {
+        "Cluster": {
+          "Ref": "ECSCluster"
+        },
+        "DesiredCount": 0,
+        "HealthCheckGracePeriodSeconds": 0,
+        "LaunchType": "FARGATE",
+        "NetworkConfiguration": {
+          "AwsvpcConfiguration": {
+            "AssignPublicIp": "ENABLED",
+            "Subnets": [
+              {
+                "Ref": "Subnet1"
+              },
+              {
+                "Ref": "Subnet2"
+              }
+            ],
+            "SecurityGroups": [
+              {
+                "Ref": "ECSServicesSecurityGroup"
+              }
+            ]
+          }
+        },
+        "LoadBalancers": [
+          {
+            "ContainerName": {
+              "Ref": "ServerName"
+            },
+            "ContainerPort": "80",
+            "TargetGroupArn": {
+              "Ref": "TargetGroup"
+            }
+          }
+        ],
+        "ServiceName": {
+          "Ref": "ServerName"
+        },
+        "TaskDefinition": {
+          "Ref": "TaskDefinition"
+        }
+      },
+      "DependsOn": [
+        "ECSServiceRole",
+        "LoadBalancerListner",
+        "ECSServicesSecurityGroup"
+      ]
+    },
+    "CodeBuildRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "codebuild.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Description": "",
+        "Path": "/",
+        "Policies": [
+          {
+            "PolicyName": "root",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": "*",
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "RoleName": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "ServerName"
+              },
+              "-codebuild-role"
+            ]
+          ]
+        },
+        "Tags": []
+      }
+    },
+    "CodeBuild": {
+      "Type": "AWS::CodeBuild::Project",
+      "Properties": {
+        "Name": {
+          "Ref": "ServerName"
+        },
+        "Description": "Code Build",
+        "ServiceRole": {
+          "Ref": "CodeBuildRole"
+        },
+        "Artifacts": {
+          "Type": "S3",
+          "Location": {
+            "Ref": "ArtifactBucket"
+          }
+        },
+        "Environment": {
+          "Type": "LINUX_CONTAINER",
+          "ComputeType": "BUILD_GENERAL1_MEDIUM",
+          "Image": "aws/codebuild/amazonlinux2-x86_64-standard:4.0",
+          "PrivilegedMode": "true",
+          "EnvironmentVariables": [
+            {
+              "Name": "IMAGE_REPO_NAME",
+              "Value": {
+                "Ref": "ECR"
+              }
+            },
+            {
+              "Name": "IMAGE_TAG",
+              "Value": "release"
+            },
+            {
+              "Name": "AWS_ACCOUNT_ID",
+              "Value": {
+                "Ref": "AWS::AccountId"
+              }
+            },
+            {
+              "Name": "AWS_DEFAULT_REGION",
+              "Value": {
+                "Ref": "AWS::Region"
+              }
+            },
+            {
+              "Name": "EnvironmentName",
+              "Value": {
+                "Ref": "ServerName"
+              }
+            }
+          ]
+        },
+        "Source": {
+          "Location": {
+            "Fn::Sub": "${ArtifactBucket}/source.zip"
+          },
+          "BuildSpec": {
+            "Ref": "BuildSpecPath"
+          },
+          "Type": "S3"
+        },
+        "TimeoutInMinutes": 20
+      },
+      "DependsOn": ["CodeBuildRole", "ArtifactBucket", "ECR"]
+    },
+    "CodeDeploy": {
+      "Type": "AWS::CodeDeploy::Application",
+      "Properties": {
+        "ApplicationName": {
+          "Ref": "ServerName"
+        },
+        "ComputePlatform": "ECS"
+      },
+      "DependsOn": ["CodeDeployRole"]
+    },
+    "CodeDeployRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": ["codedeploy.amazonaws.com"]
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Path": "/",
+        "Policies": []
+      }
+    },
+    "CodePipelineRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "codepipeline.amazonaws.com"
+              },
+              "Action": ["sts:AssumeRole"]
+            }
+          ]
+        },
+        "Path": "/",
+        "Policies": [
+          {
+            "PolicyName": "root",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:s3:::${ArtifactBucket}/*"
+                  },
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:PutObject",
+                    "s3:GetObject",
+                    "s3:GetObjectVersion",
+                    "s3:GetBucketVersioning"
+                  ]
+                },
+                {
+                  "Resource": "*",
+                  "Effect": "Allow",
+                  "Action": [
+                    "ecs:DescribeServices",
+                    "ecs:DescribeTaskDefinition",
+                    "ecs:DescribeTasks",
+                    "ecs:ListTasks",
+                    "ecs:RegisterTaskDefinition",
+                    "ecs:UpdateService",
+                    "codebuild:StartBuild",
+                    "codebuild:BatchGetBuilds",
+                    "iam:PassRole"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "ArtifactBucket": {
+      "Type": "AWS::S3::Bucket"
+    },
+    "CodePipeline": {
+      "Type": "AWS::CodePipeline::Pipeline",
+      "Properties": {
+        "Name": {
+          "Ref": "ServerName"
+        },
+        "RoleArn": {
+          "Fn::GetAtt": ["CodePipelineRole", "Arn"]
+        },
+        "ArtifactStore": {
+          "Type": "S3",
+          "Location": {
+            "Ref": "ArtifactBucket"
+          }
+        },
+        "Stages": [
+          {
+            "Actions": [
+              {
+                "ActionTypeId": {
+                  "Category": "Source",
+                  "Owner": "ThirdParty",
+                  "Provider": "GitHub",
+                  "Version": "1"
+                },
+                "Configuration": {
+                  "Owner": {
+                    "Ref": "GithubUser"
+                  },
+                  "Repo": {
+                    "Ref": "GithubRepository"
+                  },
+                  "Branch": { "Ref": "GithubBranch" },
+                  "OAuthToken": {
+                    "Ref": "GithubToken"
+                  }
+                },
+                "OutputArtifacts": [
+                  {
+                    "Name": "Source"
+                  }
+                ],
+                "Name": "Source"
+              }
+            ],
+            "Name": "Source"
+          },
+          {
+            "Actions": [
+              {
+                "ActionTypeId": {
+                  "Category": "Build",
+                  "Owner": "AWS",
+                  "Provider": "CodeBuild",
+                  "Version": "1"
+                },
+                "Configuration": {
+                  "ProjectName": {
+                    "Ref": "CodeBuild"
+                  }
+                },
+                "InputArtifacts": [
+                  {
+                    "Name": "Source"
+                  }
+                ],
+                "OutputArtifacts": [
+                  {
+                    "Name": "Build"
+                  }
+                ],
+                "Name": "Build"
+              }
+            ],
+            "Name": "Build"
+          },
+          {
+            "Actions": [
+              {
+                "ActionTypeId": {
+                  "Category": "Deploy",
+                  "Owner": "AWS",
+                  "Provider": "ECS",
+                  "Version": "1"
+                },
+                "Name": "Deploy",
+                "InputArtifacts": [
+                  {
+                    "Name": "Build"
+                  }
+                ],
+                "Configuration": {
+                  "ClusterName": {
+                    "Ref": "ECSCluster"
+                  },
+                  "ServiceName": {
+                    "Ref": "ECSService"
+                  },
+                  "FileName": "images.json"
+                }
+              }
+            ],
+            "Name": "Deploy"
+          }
+        ],
+        "Tags": []
+      },
+      "DependsOn": ["CodeBuild", "ECSService"]
+    }
+  },
+  "Outputs": {
+    "PipelineUrl": {
+      "Value": {
+        "Fn::Sub": "https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${CodePipeline}"
+      }
+    }
+  }
+}
