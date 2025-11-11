@@ -1,0 +1,9 @@
+apiVersion: myyrakle.com/v1
+kind: SecondCronJob
+metadata:
+  name: per-10-seconds 
+  namespace: myyrakle
+spec:
+  image: myyrakle/node-cronjob-for-test
+  name: per-10-seconds
+  interval_seconds: 20

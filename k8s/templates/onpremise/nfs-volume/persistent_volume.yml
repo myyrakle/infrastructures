@@ -1,0 +1,15 @@
+apiVersion: v1 
+kind: PersistentVolume
+metadata:
+  name: nfs-pv
+spec:
+  storageClassName: nfs
+  capacity:
+    storage: 50Gi # 용량
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  nfs:
+    server: 192.168.1.2 # NFS 서버의 IP
+    path: /home/nfs

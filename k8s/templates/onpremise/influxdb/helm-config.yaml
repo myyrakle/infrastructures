@@ -1,0 +1,8 @@
+setDefaultUser:
+  enabled: true
+  user:
+    username: "admin"
+    password: q1w2e3r4
+
+service:
+  type: LoadBalancer

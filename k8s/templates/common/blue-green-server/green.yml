@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: green-server
+spec:
+  replicas: 3
+  selector: 
+    matchLabels: 
+      app: green-server
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template: 
+    metadata: 
+      labels: 
+        app: green-server
+    spec: 
+      containers: 
+        - name: green-server
+          image: myyrakle/node-server-for-test:2

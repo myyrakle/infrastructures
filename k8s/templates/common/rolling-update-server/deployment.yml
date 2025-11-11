@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rolling-server
+spec:
+  replicas: 3
+  selector: 
+    matchLabels: 
+      app: rolling-server
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template: 
+    metadata: 
+      labels: 
+        app: rolling-server
+    spec: 
+      containers: 
+        - name: rolling-server
+          image: myyrakle/node-server-for-test:1

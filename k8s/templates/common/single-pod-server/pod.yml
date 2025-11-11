@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: server-name
+  labels: 
+    app: server-name 
+spec:
+  containers:
+  - name: server-name 
+    image: myyrakle/node-server-for-test
