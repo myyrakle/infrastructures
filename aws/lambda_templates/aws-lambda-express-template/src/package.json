@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "aws-serverless-express": "^3.4.0"
+  }
+}
