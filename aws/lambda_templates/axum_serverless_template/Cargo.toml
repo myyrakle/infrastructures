@@ -1,0 +1,20 @@
+[package]
+name = "axum_serverless_template"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "bootstrap"
+path = "src/main.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+lambda-web = { version = "0.2.1", features=["hyper"] }
+axum = { version = "0.6.7", features = ["multipart"] }
+tokio = { version = "1" }
+dotenv = "0.15.0"
+
+# 배포 전용 디펜던시
+[target.'cfg(unix)'.dependencies]
+openssl = { version = "0.10", features = ["vendored"] }
