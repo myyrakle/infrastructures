@@ -1,0 +1,16 @@
+version: 0.2
+
+phases:
+  build:
+    commands:
+      - cd ./src
+      - npm i
+      - zip -r ./deploy.zip .
+      - aws lambda update-function-code --function-name community-image-resizer-prod --zip-file fileb://deploy.zip
+      # - cd ..
+      # - npm i
+      # - node before-distirbution.js
+      # - aws cloudfront update-distribution --id ELNOLBRD7M2A2  --if-match E2U8VRSQAZ19NO --distribution-config "file://./distrib-config.json"
+  post_build:
+    commands:
+      - echo $?
