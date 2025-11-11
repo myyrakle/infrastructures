@@ -1,0 +1,40 @@
+{
+    "variables": {
+        "aws_region": "{{env `AWS_REGION`}}",
+        "aws_ami_name": "server", 
+	"version": "{{env `CODEBUILD_BUILD_NUMBER`}}"
+    },
+    "builders": [{
+	"source_ami": "ami-0efca9ab8ce859623", 
+        "type": "amazon-ebs",
+        "region": "{{user `aws_region`}}",
+        "instance_type": "t2.micro",
+        "ssh_username": "ubuntu",
+        "ami_name": "{{user `aws_ami_name`}}-{{user `version`}}",
+        "ami_description": "build", 
+	"associate_public_ip_address": true,
+        "communicator": "ssh",
+	"ssh_pty" : "true",
+	"temporary_key_pair_type": "ed25519"
+    }],
+    "provisioners": [
+        {
+            "type": "shell",
+            "inline": [
+                "cd /home/ubuntu/node-server-for-test",
+                "git pull",
+                "npm i",
+                "sudo systemctl restart server --no-block"
+            ]
+        }
+    ],
+    "post-processors": [
+	[
+	    {
+	        "output": "manifest.json",
+		"strip_path": true,
+		"type": "manifest"
+	    }
+	]
+    ]
+}

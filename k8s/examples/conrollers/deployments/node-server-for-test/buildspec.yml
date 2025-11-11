@@ -1,0 +1,85 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo "aws setting..."
+      - aws configure set region $AWS_REGION
+      - aws configure set aws_access_key_id $aws_access_key_id
+      - aws configure set aws_secret_access_key $aws_secret_access_key
+      - echo "aws setting complete"
+      - PROD_LISTENER_ARN=$(aws elbv2 describe-listeners --load-balancer-arn $LB_ARN --query 'Listeners[?Protocol==`TCP` && Port==`80`].ListenerArn' --output text)
+      - TEST_LISTENER_ARN=$(aws elbv2 describe-listeners --load-balancer-arn $LB_ARN --query 'Listeners[?Protocol==`TCP` && Port==`8080`].ListenerArn' --output text)
+      - CURRENT_TG_ARN=$(aws elbv2 describe-listeners --listener-arns $(aws elbv2 describe-load-balancers --load-balancer-arns $LB_ARN --query 'LoadBalancers[].{ListenerArns:ListenerArns}' --output text) --query 'Listeners[].{DefaultActions:DefaultActions}' --output text | grep 'TargetGroupArn' | awk '{print $2}')
+      - CURRENT_TG_NAME=$(aws elbv2 describe-target-groups --target-group-arns $CURRENT_TG_ARN --query 'TargetGroups[].{TargetGroupName:TargetGroupName}' --output text)
+      - NEXT_TG_ARN=$(aws elbv2 describe-listeners --listener-arns $(aws elbv2 describe-load-balancers --load-balancer-arns $LB_ARN --query 'LoadBalancers[].{ListenerArns:ListenerArns}' --output text) --query 'Listeners[].{DefaultActions:DefaultActions}' --output text | grep 'TargetGroupArn' | awk '{print $2}')
+      - NEXT_TG_NAME=$(aws elbv2 describe-target-groups --target-group-arns $NEXT_TG_ARN --query 'TargetGroups[].{TargetGroupName:TargetGroupName}' --output text)
+      - CURRENT=$CURRENT_TG_NAME
+      - |
+        if [ "$CURRENT_TG_NAME" = "blue" ];then NEXT=green 
+        else NEXT=blue 
+        fi
+      - echo "Installing HashiCorp Packer..."
+      - curl -qL -o packer.zip https://releases.hashicorp.com/packer/1.8.0/packer_1.8.0_linux_amd64.zip && unzip packer.zip
+      - echo "Installing jq..."
+      - curl -qL -o jq https://stedolan.github.io/jq/download/linux64/jq && chmod +x ./jq
+      - echo "Validating packer.json"
+      - ./packer validate packer.json
+  build:
+    commands:
+      # test here if you need
+      - ./packer build packer.json
+      - ami_id=$(cat manifest.json | jq -r .builds[0].artifact_id |  cut -d':' -f2)
+      - echo $ami_id
+  post_build:
+    commands:
+      - echo "HashiCorp Packer build completed on `date`"
+      - template_data=$(printf '{"ImageId":"%s","InstanceType":"%s"}' "$ami_id" "t2.micro")
+      - template_version=$(aws ec2 create-launch-template-version --launch-template-id $LAUNCH_TEMPLATE --launch-template-data $template_data --query 'LaunchTemplateVersion.VersionNumber')
+      - version_info=$(printf '{"Version":"%s","LaunchTemplateId":"%s"}' "$template_version" "$LAUNCH_TEMPLATE")
+      - echo $version_info
+      - desired_size=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names $CURRENT_TG_NAME --query 'AutoScalingGroups[0].[DesiredCapacity][0]' --output json)
+      - max_size=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names $CURRENT_TG_NAME --query 'AutoScalingGroups[0].[MaxSize][0]' --output json)
+      - printf 'desired_size:%s, max_size:%s' "$desired_size" "$max_size" 
+      - aws autoscaling update-auto-scaling-group --auto-scaling-group-name $NEXT --launch-template $version_info --min-size $desired_size --desired-capacity $desired_size --max-size $max_size
+      - wait autoscailing provioning...
+      - |
+        while true; do
+            status=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names $NEXT --query "AutoScalingGroups[0].Instances[?LifecycleState!='InService'].LifecycleState" --output text)
+            if [[ -z $status ]]; then
+                echo "인스턴스 변경사항이 완료되었습니다."
+                break
+            fi
+            echo "인스턴스 변경사항이 진행 중입니다. 대기 중..."
+            sleep 10
+        done
+      - echo "$NEXT target group이 healthy해질때까지 대기합니다..."
+      - timeout=30
+      - elapsed_time=0
+      - interval=5
+      - |
+        while [[ $elapsed_time -lt $timeout ]]; do
+            status=$(aws elbv2 describe-target-health --target-group-arn $TARGET_GROUP_ARN --query 'TargetHealthDescriptions[?TargetHealth.State==`healthy`]' --output text)
+
+            if [[ -n $status ]]; then
+                echo "대상 그룹이 healthy 상태가 되었습니다."
+                break
+            fi
+
+            echo "대상 그룹이 아직 healthy 상태가 아닙니다. 잠시 대기합니다..."
+            sleep $interval
+            elapsed_time=$((elapsed_time + interval))
+        done
+      - |
+        if [[ $elapsed_time -ge $timeout ]]; then
+            echo "대기 시간이 초과되었습니다. 대상 그룹이 여전히 healthy 상태가 아닙니다."
+            exit 1
+        fi
+      - echo "swap $CURRENT to $NEXT"
+      - aws elbv2 modify-listener --listener-arn $PROD_LISTENER_ARN --default-actions Type=forward,TargetGroupArn=$NEXT_TG_ARN
+      - aws elbv2 modify-listener --listener-arn $TEST_LISTENER_ARN --default-actions Type=forward,TargetGroupArn=$CURRENT_TG_ARN
+      - echo "정리 중..."
+      - aws autoscaling update-auto-scaling-group --auto-scaling-group-name $CURRENT --launch-template $version_info --min-size 0 --desired-capacity 0 --max-size $max_size
+artifacts:
+  files:
+    - '**/*'
