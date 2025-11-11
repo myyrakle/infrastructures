@@ -1,0 +1,82 @@
+networks:
+  loki:
+
+services:
+  loki:
+    build: 
+      context: .
+      dockerfile: Dockerfile.loki
+    ports:
+      - "13100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - loki
+    volumes:
+      - loki_data:/loki
+
+  promtail:
+    build: 
+      context: .
+      dockerfile: Dockerfile.promtail
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/log:/var/log
+    networks:
+      - loki
+
+  grafana:
+    environment:
+      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    entrypoint:
+      - sh
+      - -euc
+      - |
+        mkdir -p /etc/grafana/provisioning/datasources
+        cat <<EOF > /etc/grafana/provisioning/datasources/ds.yaml
+        apiVersion: 1
+        datasources:
+        - name: Loki
+          type: loki
+          access: proxy 
+          orgId: 1
+          url: http://loki:3100
+          basicAuth: false
+          isDefault: true
+          version: 1
+          editable: false
+        EOF
+        /run.sh
+    image: grafana/grafana:11.5.1
+    ports:
+      - "13000:3000"
+    networks:
+      - loki
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - grafana_etc:/etc/grafana
+      
+  nodejs-server: 
+    build: 
+      context: .
+      dockerfile: Dockerfile.nodejs
+    networks: 
+      - loki
+    depends_on: 
+      - loki
+      - grafana
+    deploy:
+      replicas: 3
+    environment:
+      SERVICE_NAME: nodejs-server
+    volumes:
+      - /var/log:/var/log
+
+volumes:
+  loki_data:
+    driver: local
+  grafana_data:
+    driver: local
+  grafana_etc: 
+    driver: local

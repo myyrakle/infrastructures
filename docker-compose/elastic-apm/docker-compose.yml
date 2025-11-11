@@ -1,0 +1,218 @@
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.18.0
+    container_name: elasticsearch
+    environment:
+      - node.name=elasticsearch
+      - cluster.name=elastic-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=true
+      - xpack.security.enrollment.enabled=true
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+      - xpack.security.authc.token.enabled=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "19200:9200"
+      - "19300:9300"
+    networks:
+      - elastic
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200 > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  password-setter:
+    image: docker:latest 
+    container_name: password-setter
+    command: >
+      /bin/sh -c "
+        if [ -f /config/elastic_password.env ]; then
+          echo 'Password has already been set. Skipping.';
+          exit 0;
+        fi;
+
+        echo 'Waiting for Elasticsearch to be ready before setting password...';
+        sleep 5; 
+
+        echo 'Setting password for elastic user...';
+
+        PASSWORD=$(docker exec elasticsearch bin/elasticsearch-reset-password -u elastic -s -b -a);
+        echo \"ELASTIC_PASSWORD=$$PASSWORD\" > /config/elastic_password.env;
+
+        echo 'Password set successfully.';
+      "
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./config:/config
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  kibana-token-setter:
+    image: alpine:latest
+    container_name: kibana-token-setter
+    command: >
+      sh -c "
+        source /config/elastic_password.env
+        env
+        ELASTIC_PASSWORD=$${ELASTIC_PASSWORD}
+        echo $$ELASTIC_PASSWORD
+
+        if [ -f /config/kibana_token.env ]; then
+          echo 'Kibana service token already exists. Skipping creation.';
+          exit 0;
+        fi;
+
+        if [ -f /config/kibana_token.env ]; then
+          echo 'Kibana token file exists. Skipping creation.';
+          exit 0;
+        fi;
+
+        echo 'Creating Kibana service token...';
+
+        apk add --no-cache curl jq;
+
+        echo 'Creating Kibana service token...';
+        # 서비스 토큰 생성 API 호출 (비밀번호 변수를 큰따옴표로 감싸고 $$로 이스케이프)
+        TOKEN_RESPONSE=$(curl -s -X POST 'http://elasticsearch:9200/_security/service/elastic/kibana/credential/token/kibana?pretty' -u "elastic:$${ELASTIC_PASSWORD}" -H 'Content-Type: application/json');
+        echo \"Response: $$TOKEN_RESPONSE\";
+
+        # 응답에서 토큰 값 추출
+        TOKEN=$(echo $${TOKEN_RESPONSE} | jq -r '.token.value');
+
+        if [ '$$TOKEN' = null ] || [ -z '$$TOKEN' ] || [ "$$TOKEN" = "" ]; then
+          echo 'Error: Failed to create or parse service token.';
+          echo \"Response: $$TOKEN_RESPONSE\";
+          exit 1;
+        fi;
+        
+        # 호스트와 공유된 볼륨에 .env 파일로 저장
+        echo \"ELASTICSEARCH_SERVICEACCOUNTTOKEN=$$TOKEN\" > /config/kibana_token.env;
+        echo 'Kibana token has been saved to ./config/kibana_token.env';
+      "
+    volumes:
+      - ./config:/config
+    networks:
+      - elastic
+    depends_on:
+      password-setter:
+        condition: service_completed_successfully
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.18.0
+    container_name: kibana
+    command: >
+      sh -c "
+        # 토큰 파일이 존재하면 읽어서 환경 변수로 로드
+        if [ -f /config/kibana_token.env ]; then
+          . /config/kibana_token.env;
+          echo 'Service account token loaded.';
+        else
+          echo 'WARNING: Service account token file not found.';
+        fi;
+        # Kibana 원래 실행 명령어 실행
+        exec /usr/local/bin/kibana-docker;
+      "
+    environment:
+      - ELASTICSEARCH_SERVICEACCOUNTTOKEN=$${ELASTICSEARCH_SERVICEACCOUNTTOKEN}
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - SERVER_NAME=kibana
+      - SERVER_SSL_ENABLED=false
+      - SERVER_HOST=0.0.0.0
+      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=mcgAgWoNTiZlWULDW8vZuRlzFPKCb7X7 # you should replace this with a strong key
+    ports:
+      - "15601:5601"
+    networks:
+      - elastic
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      kibana-token-setter:
+        condition: service_completed_successfully
+    volumes:
+      - ./config:/config
+    healthcheck:
+      test: ["CMD-SHELL", "curl http://localhost:5601"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  apm-server:
+    image: docker.elastic.co/apm/apm-server:8.18.0
+    container_name: apm-server
+    command: >
+      sh -c "
+        . /config/elastic_password.env
+        ELASTIC_PASSWORD=$${ELASTIC_PASSWORD} 
+        echo $$ELASTIC_PASSWORD
+
+        rm /usr/share/apm-server/apm-server.yml
+        touch /usr/share/apm-server/apm-server.yml
+
+        echo 'apm-server:' >> /usr/share/apm-server/apm-server.yml
+        echo '  host: \"0.0.0.0:8200\"' >> /usr/share/apm-server/apm-server.yml
+        echo '  auth:' >> /usr/share/apm-server/apm-server.yml
+        echo '    secret_token: \"q1w2e3r4\"' >> /usr/share/apm-server/apm-server.yml
+
+        echo 'output.elasticsearch:' >> /usr/share/apm-server/apm-server.yml
+        echo '  enabled: true' >> /usr/share/apm-server/apm-server.yml
+        echo '  hosts: [\"http://elasticsearch:9200\"]' >> /usr/share/apm-server/apm-server.yml
+        echo '  username: \"elastic\"' >> /usr/share/apm-server/apm-server.yml
+        echo \"  password: $$ELASTIC_PASSWORD\" >> /usr/share/apm-server/apm-server.yml
+
+        echo 'path:' >> /usr/share/apm-server/apm-server.yml
+        echo '  data: /usr/share/apm-server/data' >> /usr/share/apm-server/apm-server.yml
+        echo '  home: /usr/share/apm-server' >> /usr/share/apm-server/apm-server.yml
+        echo '  config: /usr/share/apm-server/config' >> /usr/share/apm-server/apm-server.yml
+        echo '  logs: /usr/share/apm-server/logs' >> /usr/share/apm-server/apm-server.yml
+
+        echo 'logging.level: info' >> /usr/share/apm-server/apm-server.yml
+
+        cat /usr/share/apm-server/apm-server.yml
+
+        exec apm-server -e
+      "
+    volumes:
+      - ./config:/config:ro
+    ports:
+      - "18200:8200"
+    networks:
+      - elastic
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      kibana:
+        condition: service_healthy
+
+  sample-app:
+    build:
+      context: ./sample-app
+      dockerfile: Dockerfile
+    container_name: sample-app
+    environment:
+    # Install necessary packages
+      - ELASTIC_APM_SERVICE_NAME=elastic-apm-sample-app
+      - ELASTIC_APM_SERVER_URL=http://apm-server:8200
+      - ELASTIC_APM_ENVIRONMENT=development
+      - ELASTIC_APM_SECRET_TOKEN=q1w2e3r4
+    ports:
+      - "8080:8080"
+    networks:
+      - elastic
+
+volumes:
+  elasticsearch_data:
+    driver: local
+
+networks:
+  elastic:
+    driver: bridge

@@ -1,0 +1,32 @@
+server:
+  http_listen_port: 0
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    tenant_id: 1
+
+scrape_configs:
+  - job_name: collect-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          __path__: /var/log/loki/*.log
+    pipeline_stages:
+      - json:
+          expressions:
+            level: level
+            service: service
+            message: message
+            shopID: shopID
+            containerID: containerID
+            timestamp: timestamp
+      - labels:
+          job: containerID
+          service_name: service
+          level: level
+          shopID: shopID

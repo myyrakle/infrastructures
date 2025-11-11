@@ -1,0 +1,5 @@
+FROM node:23-alpine
+WORKDIR /usr/app
+COPY ./nodejs-server ./
+RUN npm install  
+ENTRYPOINT [ "/usr/local/bin/node", "/usr/app/main.js" ]

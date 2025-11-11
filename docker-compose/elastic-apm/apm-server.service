@@ -1,0 +1,13 @@
+[Unit]
+Description=APM Server
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+Restart=always
+ExecStart=/bin/bash -c "docker compose -f /home/ubuntu/docker-compose.yml up apm-server"
+ExecStop=/bin/bash -c "docker compose -f /home/ubuntu/docker-compose.yml down apm-server"
+
+[Install]
+WantedBy=multi-user.target

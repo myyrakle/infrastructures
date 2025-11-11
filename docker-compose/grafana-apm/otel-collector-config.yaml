@@ -1,0 +1,107 @@
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+
+  otlp:
+    tls:
+      insecure: true
+    endpoint: "tempo:4317"
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      exporters: [prometheus]
+    metrics/httpmetrics:
+      receivers: [spanmetrics/http]
+      exporters: [prometheus]
+      processors: [filter/http]
+    metrics/outbound-dbmetrics:
+      receivers: [spanmetrics/outbound-db]
+      exporters: [prometheus]
+      processors: [filter/outbound-db]
+    metrics/outbound-httpmetrics:
+      receivers: [spanmetrics/outbound-http]
+      exporters: [prometheus]
+      processors: [filter/outbound-http]
+    traces:
+      receivers: [otlp]
+      exporters:
+        [
+          spanmetrics/http,
+          spanmetrics/outbound-db,
+          spanmetrics/outbound-http,
+          otlp,
+        ]
+  telemetry:
+    metrics:
+      address: 0.0.0.0:8888
+      level: detailed
+
+connectors:
+  spanmetrics/http:
+    namespace: http_server_request
+    dimensions:
+      - name: http.method
+      - name: http.status_code
+      - name: http.route
+      - name: service.namespace
+    histogram:
+      unit: s
+    exemplars:
+      enabled: true
+    events:
+      enabled: true
+      dimensions:
+        - name: exception.type
+  spanmetrics/outbound-db:
+    namespace: db_client_operation
+    dimensions:
+      - name: service.namespace
+      - name: db.system.name
+      - name: db.collection.name
+      - name: db.database
+      - name: db.operation
+      - name: db.operation.name
+    histogram:
+      unit: s
+  spanmetrics/outbound-http:
+    namespace: http_client_request
+    dimensions:
+      - name: service.namespace
+      - name: server.address
+      - name: server.port
+      - name: http.request.method
+      - name: http.response.status_code
+      - name: url.template
+    histogram:
+      unit: s
+
+processors:
+  filter/http:
+    error_mode: ignore
+    traces:
+      span:
+        - attributes["span.group"] == "API-SERVER"
+  filter/outbound-db:
+    error_mode: ignore
+    traces:
+      span:
+        - attributes["span.group"] == "OUTBOUND-DATABASE"
+  filter/outbound-http:
+    error_mode: ignore
+    traces:
+      span:
+        - attributes["span.group"] == "OUTBOUND-HTTP"
+
+  # If you need to limit memory usage, uncomment the following section
+  # memory_limiter:
+  #   check_interval: 1s
+  #   limit_mib: 1900 # 1.9 GB
+  #   spike_limit_mib: 400 # 400 MB (1900-400 = 1.5GB)
