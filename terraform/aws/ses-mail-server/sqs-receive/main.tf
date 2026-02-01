@@ -36,7 +36,8 @@ resource "aws_ses_active_receipt_rule_set" "main" {
 
 # SNS Topic (SES에서 이메일을 받을 토픽)
 resource "aws_sns_topic" "ses_notifications" {
-  name = "${var.service_name}-ses-notifications"
+  name              = "${var.service_name}-ses-notifications"
+  kms_master_key_id = var.sns_kms_key_id
 
   tags = {
     Name        = "${var.service_name}-ses-notifications"
@@ -75,6 +76,11 @@ resource "aws_sqs_queue" "email_queue" {
   visibility_timeout_seconds = 300
   message_retention_seconds  = 1209600 # 14일
   receive_wait_time_seconds  = 20      # Long polling
+
+  # 암호화 설정 (KMS 키가 지정되지 않으면 AWS 관리형 SSE 사용)
+  sqs_managed_sse_enabled = var.sqs_kms_key_id == null ? true : null
+  kms_master_key_id       = var.sqs_kms_key_id
+  kms_data_key_reuse_period_seconds = var.sqs_kms_key_id != null ? 300 : null
 
   tags = {
     Name        = "${var.service_name}-email-queue"

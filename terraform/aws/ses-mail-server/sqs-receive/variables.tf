@@ -28,3 +28,17 @@ variable "receipt_rule_recipients" {
   type        = list(string)
   default     = []
 }
+
+// SNS KMS 키 ID (null이면 AWS 관리형 키 사용)
+variable "sns_kms_key_id" {
+  description = "KMS key ID for SNS topic encryption (default: alias/aws/sns)"
+  type        = string
+  default     = "alias/aws/sns"
+}
+
+// SQS KMS 키 ID (null이면 AWS 관리형 SSE 사용)
+variable "sqs_kms_key_id" {
+  description = "KMS key ID for SQS queue encryption (default: null = AWS managed SSE)"
+  type        = string
+  default     = null
+}

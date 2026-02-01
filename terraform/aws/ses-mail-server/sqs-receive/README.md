@@ -41,6 +41,13 @@ receipt_rule_recipients = ["support@mail.example.com", "contact@mail.example.com
 
 # 모든 이메일을 수신하려면 (기본값)
 # receipt_rule_recipients = []
+
+# 암호화 설정 (선택사항)
+# sns_kms_key_id = "alias/aws/sns"  # SNS용 AWS 관리형 KMS 키 (기본값)
+# sqs_kms_key_id = null              # SQS용 AWS 관리형 SSE (기본값)
+# 커스텀 KMS 키를 사용하려면:
+# sns_kms_key_id = "arn:aws:kms:ap-northeast-2:123456789012:key/your-key-id"
+# sqs_kms_key_id = "arn:aws:kms:ap-northeast-2:123456789012:key/your-key-id"
 ```
 
 ### 2. Terraform 초기화 및 적용
@@ -128,6 +135,52 @@ SQS 큐에 저장되는 메시지는 다음과 같은 형식입니다.
 
 `Message` 필드를 파싱하면 실제 이메일 내용을 확인할 수 있습니다.
 
+## 보안
+
+### 암호화
+
+이 구성은 기본적으로 다음과 같은 암호화를 적용합니다.
+
+1. **SNS Topic 암호화**
+   - 기본값: AWS 관리형 KMS 키 (`alias/aws/sns`)
+   - 이메일 데이터가 SNS를 통해 전달될 때 암호화됩니다.
+
+2. **SQS Queue 암호화**
+   - 기본값: AWS 관리형 SSE (Server-Side Encryption)
+   - 큐에 저장되는 메시지가 암호화됩니다.
+
+3. **커스텀 KMS 키 사용**
+   - 더 강력한 제어가 필요한 경우 커스텀 KMS 키를 생성하여 사용할 수 있습니다.
+   - `terraform.tfvars`에서 `sns_kms_key_id`와 `sqs_kms_key_id`를 설정하세요.
+
+### IAM 권한
+
+SQS 큐와 SNS 토픽에 접근하려면 적절한 IAM 권한이 필요합니다.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "sqs:ReceiveMessage",
+        "sqs:DeleteMessage",
+        "sqs:GetQueueAttributes"
+      ],
+      "Resource": "arn:aws:sqs:REGION:ACCOUNT_ID:QUEUE_NAME"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "kms:Decrypt"
+      ],
+      "Resource": "arn:aws:kms:REGION:ACCOUNT_ID:key/KEY_ID"
+    }
+  ]
+}
+```
+
 ## 주의사항
 
 1. **SES Sandbox**: AWS 계정이 SES Sandbox 모드인 경우, 인증된 이메일 주소에서만 이메일을 보낼 수 있습니다. Production 사용을 위해서는 SES의 Sandbox 해제를 신청해야 합니다.
@@ -136,7 +189,7 @@ SQS 큐에 저장되는 메시지는 다음과 같은 형식입니다.
 
 3. **비용**: SQS 메시지 보관 기간은 14일로 설정되어 있습니다. 필요에 따라 조정하세요.
 
-4. **보안**: 실제 운영 환경에서는 SQS 큐에 대한 접근 권한을 적절히 제한해야 합니다.
+4. **KMS 비용**: KMS 키를 사용하면 암호화/복호화 작업마다 추가 비용이 발생합니다. AWS 관리형 키는 무료이지만, 커스텀 키는 월별 요금과 API 호출 요금이 부과됩니다.
 
 ## 정리
 
