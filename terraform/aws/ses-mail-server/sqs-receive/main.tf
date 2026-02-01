@@ -115,9 +115,10 @@ resource "aws_sqs_queue_policy" "email_queue" {
 
 # SNS -> SQS Subscription (SNS 토픽을 SQS 큐에 연결)
 resource "aws_sns_topic_subscription" "email_queue" {
-  topic_arn = aws_sns_topic.ses_notifications.arn
-  protocol  = "sqs"
-  endpoint  = aws_sqs_queue.email_queue.arn
+  topic_arn            = aws_sns_topic.ses_notifications.arn
+  protocol             = "sqs"
+  endpoint             = aws_sqs_queue.email_queue.arn
+  raw_message_delivery = true  # 원시 메시지 전송 활성화
 }
 
 # SES Receipt Rule (이메일을 SNS로 전달)
@@ -131,6 +132,7 @@ resource "aws_ses_receipt_rule" "sns_forward" {
   sns_action {
     topic_arn = aws_sns_topic.ses_notifications.arn
     position  = 1
+    encoding  = "UTF-8"
   }
 
   depends_on = [aws_sns_topic_policy.ses_notifications]

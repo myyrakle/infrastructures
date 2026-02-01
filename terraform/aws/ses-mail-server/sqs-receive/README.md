@@ -117,23 +117,63 @@ aws sqs receive-message --queue-url <queue-url> --region ap-northeast-2
 
 ## 메시지 형식
 
-SQS 큐에 저장되는 메시지는 다음과 같은 형식입니다.
+SQS 큐에 저장되는 메시지는 원시 메시지 전송(Raw Message Delivery)이 활성화되어 있어, SES에서 받은 원본 메시지가 직접 전달됩니다.
 
 ```json
 {
-  "Type": "Notification",
-  "MessageId": "...",
-  "TopicArn": "arn:aws:sns:...",
-  "Message": "{\"notificationType\":\"Received\",\"mail\":{...},\"receipt\":{...}}",
-  "Timestamp": "2024-01-01T00:00:00.000Z",
-  "SignatureVersion": "1",
-  "Signature": "...",
-  "SigningCertURL": "...",
-  "UnsubscribeURL": "..."
+  "notificationType": "Received",
+  "mail": {
+    "timestamp": "2024-01-01T00:00:00.000Z",
+    "source": "sender@example.com",
+    "messageId": "...",
+    "destination": ["receiver@mail.example.com"],
+    "headersTruncated": false,
+    "headers": [
+      {
+        "name": "From",
+        "value": "sender@example.com"
+      },
+      {
+        "name": "To",
+        "value": "receiver@mail.example.com"
+      },
+      {
+        "name": "Subject",
+        "value": "Email Subject"
+      }
+    ],
+    "commonHeaders": {
+      "from": ["sender@example.com"],
+      "to": ["receiver@mail.example.com"],
+      "subject": "Email Subject"
+    }
+  },
+  "receipt": {
+    "timestamp": "2024-01-01T00:00:00.000Z",
+    "processingTimeMillis": 100,
+    "recipients": ["receiver@mail.example.com"],
+    "spamVerdict": {
+      "status": "PASS"
+    },
+    "virusVerdict": {
+      "status": "PASS"
+    },
+    "spfVerdict": {
+      "status": "PASS"
+    },
+    "dkimVerdict": {
+      "status": "PASS"
+    },
+    "action": {
+      "type": "SNS",
+      "topicArn": "arn:aws:sns:...",
+      "encoding": "UTF8"
+    }
+  }
 }
 ```
 
-`Message` 필드를 파싱하면 실제 이메일 내용을 확인할 수 있습니다.
+원시 메시지 전송이 활성화되어 있어 SNS 메타데이터 래핑 없이 SES 이메일 알림이 직접 전달됩니다.
 
 ## 보안
 
