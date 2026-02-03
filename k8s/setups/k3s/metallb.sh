@@ -1,5 +1,5 @@
 kubectl create ns metallb-system
-helm upgrade --install -n metallb-system metallb oci://registry-1.docker.io/bitnamicharts/metallb
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.12/config/manifests/metallb-native.yaml
 vi L2-range-allocation.yaml
 kubectl apply -f ./L2-range-allocation.yaml
 
