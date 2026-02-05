@@ -47,8 +47,8 @@ data:
   registries.conf: |
     registries:
     - name: ECR
-      prefix: 209863623098.dkr.ecr.ap-northeast-2.amazonaws.com
-      api_url: https://209863623098.dkr.ecr.ap-northeast-2.amazonaws.com
+      prefix: *.dkr.ecr.ap-northeast-2.amazonaws.com
+      api_url: https://*.dkr.ecr.ap-northeast-2.amazonaws.com
       credentials: pullsecret:default/k8s-ecr-login-renew-docker-secret
       default: true
 '
