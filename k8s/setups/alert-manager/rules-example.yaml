@@ -1,0 +1,149 @@
+# prometheus-rules.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: k8s-alerts
+  namespace: default
+  labels:
+    release: prometheus
+spec:
+  groups:
+    # Pod 관련 알림
+    - name: pod-alerts
+      interval: 30s
+      rules:
+        # 1. Pod CrashLoopBackOff
+        - alert: PodCrashLooping
+          expr: |
+            rate(kube_pod_container_status_restarts_total[15m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+            component: pod
+          annotations:
+            summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is crash looping"
+            description: "Pod has restarted {{ $value }} times in 15 minutes"
+
+        # 2. Pod가 오래 Pending
+        - alert: PodStuckInPending
+          expr: |
+            kube_pod_status_phase{phase="Pending"} == 1
+          for: 10m
+          labels:
+            severity: warning
+            component: pod
+          annotations:
+            summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} stuck in Pending"
+            description: "Pod has been in Pending state for more than 10 minutes"
+
+        # 3. Pod OOMKilled
+        - alert: PodOOMKilled
+          expr: |
+            kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
+          for: 30s
+          labels:
+            severity: critical
+            component: pod
+          annotations:
+            summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} was OOMKilled"
+            description: "Container {{ $labels.container }} ran out of memory and was killed"
+
+        # 4. Pod Failed 상태
+        - alert: PodFailed
+          expr: |
+            kube_pod_status_phase{phase="Failed"} == 1
+          for: 1m
+          labels:
+            severity: critical
+            component: pod
+          annotations:
+            summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} has failed"
+            description: "Pod is in Failed state and will not restart"
+
+        # 5. Container 비정상 종료 (Error)
+        - alert: ContainerTerminatedWithError
+          expr: |
+            kube_pod_container_status_last_terminated_reason{reason="Error"} == 1
+          for: 1m
+          labels:
+            severity: critical
+            component: pod
+          annotations:
+            summary: "Container in {{ $labels.namespace }}/{{ $labels.pod }} terminated with error"
+            description: "Container {{ $labels.container }} exited with an error"
+
+        # 6. Container 비정상 종료 (일반)
+        - alert: ContainerTerminatedAbnormally
+          expr: |
+            kube_pod_container_status_terminated_reason{reason!="Completed",reason!=""} == 1
+          for: 1m
+          labels:
+            severity: warning
+            component: pod
+          annotations:
+            summary: "Container in {{ $labels.namespace }}/{{ $labels.pod }} terminated abnormally"
+            description: "Container {{ $labels.container }} terminated with reason: {{ $labels.reason }}"
+
+        # 7. Deployment의 Replica 불일치
+        - alert: DeploymentReplicasMismatch
+          expr: |
+            kube_deployment_spec_replicas != kube_deployment_status_replicas_available
+          for: 10m
+          labels:
+            severity: warning
+            component: deployment
+          annotations:
+            summary: "Deployment {{ $labels.namespace }}/{{ $labels.deployment }} has mismatched replicas"
+            description: "Expected {{ $value }} replicas but only some are available"
+
+    # Node 관련 알림
+    - name: node-alerts
+      interval: 30s
+      rules:
+        # 1. Node NotReady
+        - alert: NodeNotReady
+          expr: |
+            kube_node_status_condition{condition="Ready",status="true"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            component: node
+          annotations:
+            summary: "Node {{ $labels.node }} is not ready"
+            description: "Node has been in NotReady state for more than 5 minutes"
+
+        # 2. Node에 Taint 추가됨
+        - alert: NodeTaintAdded
+          expr: |
+            kube_node_spec_taint{effect="NoSchedule"} == 1
+          for: 1m
+          labels:
+            severity: warning
+            component: node
+          annotations:
+            summary: "Node {{ $labels.node }} has NoSchedule taint"
+            description: "Taint key={{ $labels.key }}, value={{ $labels.value }}"
+
+        # 3. Node 메모리 부족
+        - alert: NodeMemoryPressure
+          expr: |
+            kube_node_status_condition{condition="MemoryPressure",status="true"} == 1
+          for: 5m
+          labels:
+            severity: warning
+            component: node
+          annotations:
+            summary: "Node {{ $labels.node }} has memory pressure"
+            description: "Node is running low on memory"
+
+        # 4. Node 디스크 부족
+        - alert: NodeDiskPressure
+          expr: |
+            kube_node_status_condition{condition="DiskPressure",status="true"} == 1
+          for: 5m
+          labels:
+            severity: warning
+            component: node
+          annotations:
+            summary: "Node {{ $labels.node }} has disk pressure"
+            description: "Node is running low on disk space"
