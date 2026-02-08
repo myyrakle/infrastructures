@@ -12,17 +12,17 @@ spec:
     - name: pod-alerts
       interval: 30s
       rules:
-        # 1. Pod CrashLoopBackOff
+        # 1. Pod CrashLoopBackOff (15분에 2회 이상 재시작)
         - alert: PodCrashLooping
           expr: |
-            rate(kube_pod_container_status_restarts_total[15m]) > 0
+            rate(kube_pod_container_status_restarts_total[15m]) > 0.01
           for: 5m
           labels:
             severity: warning
             component: pod
           annotations:
             summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is crash looping"
-            description: "Pod has restarted {{ $value }} times in 15 minutes"
+            description: "Pod is restarting frequently"
 
         # 2. Pod가 오래 Pending
         - alert: PodStuckInPending
@@ -147,3 +147,75 @@ spec:
           annotations:
             summary: "Node {{ $labels.node }} has disk pressure"
             description: "Node is running low on disk space"
+
+        # 5. Node 디스크 사용량 경고 (70%)
+        - alert: NodeDiskUsageHigh
+          expr: |
+            (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|fuse.lxcfs|squashfs|vfat"} / node_filesystem_size_bytes) * 100 > 70
+          for: 5m
+          labels:
+            severity: warning
+            component: node
+          annotations:
+            summary: "Node {{ $labels.instance }} disk usage is high"
+            description: "Disk usage on {{ $labels.device }} is {{ $value | humanize }}%"
+
+        # 6. Node 디스크 사용량 위험 (90%)
+        - alert: NodeDiskUsageCritical
+          expr: |
+            (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|fuse.lxcfs|squashfs|vfat"} / node_filesystem_size_bytes) * 100 > 90
+          for: 5m
+          labels:
+            severity: critical
+            component: node
+          annotations:
+            summary: "Node {{ $labels.instance }} disk usage is critical"
+            description: "Disk usage on {{ $labels.device }} is {{ $value | humanize }}%"
+
+        # 7. Node 메모리 사용량 경고 (70%)
+        - alert: NodeMemoryUsageHigh
+          expr: |
+            (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 > 70
+          for: 5m
+          labels:
+            severity: warning
+            component: node
+          annotations:
+            summary: "Node {{ $labels.instance }} memory usage is high"
+            description: "Memory usage is {{ $value | humanize }}%"
+
+        # 8. Node 메모리 사용량 위험 (90%)
+        - alert: NodeMemoryUsageCritical
+          expr: |
+            (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 > 90
+          for: 5m
+          labels:
+            severity: critical
+            component: node
+          annotations:
+            summary: "Node {{ $labels.instance }} memory usage is critical"
+            description: "Memory usage is {{ $value | humanize }}%"
+
+        # 9. Node CPU 사용량 경고 (70%)
+        - alert: NodeCPUUsageHigh
+          expr: |
+            100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 70
+          for: 5m
+          labels:
+            severity: warning
+            component: node
+          annotations:
+            summary: "Node {{ $labels.instance }} CPU usage is high"
+            description: "CPU usage is {{ $value | humanize }}%"
+
+        # 10. Node CPU 사용량 위험 (90%)
+        - alert: NodeCPUUsageCritical
+          expr: |
+            100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+          for: 5m
+          labels:
+            severity: critical
+            component: node
+          annotations:
+            summary: "Node {{ $labels.instance }} CPU usage is critical"
+            description: "CPU usage is {{ $value | humanize }}%"
