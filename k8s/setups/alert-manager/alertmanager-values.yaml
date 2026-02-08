@@ -1,0 +1,57 @@
+alertmanager:
+  config:
+    global:
+      slack_api_url: "https://slack.com/api/chat.postMessage"
+
+    route:
+      group_by: ["alertname", "cluster", "namespace"]
+      group_wait: 10s # 첫 알림 대기
+      group_interval: 10s # 그룹에 새 알림 추가 대기
+      repeat_interval: 12h # 같은 알림 반복 간격
+      receiver: "slack-critical"
+
+      routes:
+        # Critical 알림
+        - match:
+            severity: critical
+          receiver: "slack-critical"
+          continue: true
+
+        # Warning 알림
+        - match:
+            severity: warning
+          receiver: "slack-warnings"
+
+    receivers:
+      # Critical 알림 (즉시)
+      - name: "slack-critical"
+        slack_configs:
+          - channel: "채널 ID"
+            title: '{{ if eq .Status "firing" }}🔴 Critical Alert{{ else }}✅ Resolved: Critical Alert{{ end }}'
+            text: |-
+              <!here>
+              {{ if eq .Status "resolved" }}*Status:* RESOLVED{{ end }}
+              *Alert:* {{ .GroupLabels.alertname }}
+              *Severity:* {{ .CommonLabels.severity }}
+              *Summary:* {{ .CommonAnnotations.summary }}
+              *Description:* {{ .CommonAnnotations.description }}
+            send_resolved: true
+            http_config:
+              authorization:
+                credentials: "SLACK 토큰"
+
+      # Warning 알림
+      - name: "slack-warnings"
+        slack_configs:
+          - channel: "채널 ID"
+            title: '{{ if eq .Status "firing" }}⚠️ Warning{{ else }}✅ Resolved: Warning{{ end }}'
+            text: |-
+              {{ if eq .Status "resolved" }}*Status:* RESOLVED{{ end }}
+              *Alert:* {{ .GroupLabels.alertname }}
+              *Namespace:* {{ .CommonLabels.namespace }}
+              *Pod:* {{ .CommonLabels.pod }}
+              *Description:* {{ .CommonAnnotations.description }}
+            send_resolved: true
+            http_config:
+              authorization:
+                credentials: "SLACK 토큰"
