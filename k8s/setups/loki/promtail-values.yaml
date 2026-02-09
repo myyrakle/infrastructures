@@ -1,0 +1,72 @@
+# Promtail Helm Values (Loki v3용)
+# helm install promtail grafana/promtail -n logging -f promtail-values.yaml
+
+# DaemonSet으로 모든 노드에 배포
+daemonset:
+  enabled: true
+
+# Loki 엔드포인트 설정
+config:
+  clients:
+    - url: http://loki-gateway/loki/api/v1/push
+      # 또는 gateway 없이 직접 write 사용:
+      # - url: http://loki-write:3100/loki/api/v1/push
+
+  # 로그 수집 설정
+  snippets:
+    scrapeConfigs: |
+      # 1. Kubernetes Pod 로그 자동 수집
+      - job_name: kubernetes-pods
+        pipeline_stages:
+          - cri: {}
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          # Pod 네임스페이스
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          # Pod 이름
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          # Container 이름
+          - source_labels: [__meta_kubernetes_pod_container_name]
+            target_label: container
+          # Node 이름
+          - source_labels: [__meta_kubernetes_pod_node_name]
+            target_label: node
+          # Pod labels을 Loki labels로 변환
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          # 로그 파일 경로 (containerd 기본)
+          - source_labels: [__meta_kubernetes_pod_uid, __meta_kubernetes_pod_container_name]
+            target_label: __path__
+            separator: /
+            replacement: /var/log/pods/*$1/*.log
+
+# 리소스 제한
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# 서비스어카운트
+serviceAccount:
+  create: true
+
+# 우선순위
+priorityClassName: ""
+
+# 추가 스크랩 설정 (선택사항)
+# 시스템 로그를 수집하려면 아래 주석 해제
+# extraVolumes:
+#   - name: journal
+#     hostPath:
+#       path: /var/log/journal
+#
+# extraVolumeMounts:
+#   - name: journal
+#     mountPath: /var/log/journal
+#     readOnly: true
