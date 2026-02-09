@@ -5,12 +5,10 @@
 daemonset:
   enabled: true
 
-# Loki 엔드포인트 설정
+# Loki 엔드포인트 설정 (SingleBinary 모드)
 config:
   clients:
-    - url: http://loki-gateway/loki/api/v1/push
-      # 또는 gateway 없이 직접 write 사용:
-      # - url: http://loki-write:3100/loki/api/v1/push
+    - url: http://loki:3100/loki/api/v1/push
 
   # 로그 수집 설정
   snippets:
@@ -34,6 +32,21 @@ config:
           # Node 이름
           - source_labels: [__meta_kubernetes_pod_node_name]
             target_label: node
+
+          # Deployment/App 이름 추가
+          # app 레이블 (일반적으로 deployment 이름)
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            target_label: app
+          # app.kubernetes.io/name 레이블
+          - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+            target_label: app_name
+          # ReplicaSet Controller 이름 (Deployment-해시 형태)
+          - source_labels: [__meta_kubernetes_pod_controller_name]
+            target_label: controller
+          # Controller 종류 (Deployment, StatefulSet, DaemonSet 등)
+          - source_labels: [__meta_kubernetes_pod_controller_kind]
+            target_label: controller_kind
+
           # Pod labels을 Loki labels로 변환
           - action: labelmap
             regex: __meta_kubernetes_pod_label_(.+)
