@@ -1,5 +1,10 @@
-# 배포 모드: simple-scalable (read/write 분리, 중소규모에 적합)
-deploymentMode: SimpleScalable
+# Loki v3 Helm Values (최신 차트)
+# helm repo add grafana https://grafana.github.io/helm-charts
+# helm repo update
+# helm install loki grafana/loki -n logging --create-namespace -f loki-values.yaml
+
+# 배포 모드: SingleBinary (로컬/중소규모, filesystem 스토리지 사용)
+deploymentMode: SingleBinary
 
 loki:
   # 인증 비활성화 (내부 사용)
@@ -26,7 +31,7 @@ loki:
 
   # 보존 기간 설정
   limits_config:
-    retention_period: 168h  # 7일
+    retention_period: 168h # 7일
     max_query_length: 168h
     # 수집 제한
     ingestion_rate_mb: 10
@@ -45,12 +50,12 @@ loki:
     retention_delete_worker_count: 150
     compaction_interval: 10m
 
-# Write 컴포넌트 (로그 수신 및 저장)
-write:
-  replicas: 3
+# Single Binary 모드 설정 (모든 컴포넌트가 하나의 프로세스에서 실행)
+singleBinary:
+  replicas: 1  # filesystem 스토리지에서는 1개만 가능 (HA를 위해선 object storage 필요)
   persistence:
     enabled: true
-    size: 35Gi
+    size: 100Gi  # 1개 replica에 모든 데이터 저장
     storageClass: local-path
   resources:
     limits:
@@ -59,52 +64,27 @@ write:
     requests:
       cpu: 200m
       memory: 512Mi
+  # Compactor를 single binary에 포함
+  extraArgs:
+    - -target=all,compactor
 
-# Read 컴포넌트 (쿼리 처리)
-read:
-  replicas: 2
-  persistence:
-    enabled: true
-    size: 10Gi
-    storageClass: local-path
-  resources:
-    limits:
-      cpu: 500m
-      memory: 1Gi
-    requests:
-      cpu: 100m
-      memory: 256Mi
+  # 특정 노드(processor-1)에만 배치
+  nodeSelector:
+    kubernetes.io/hostname: processor-1
 
-# Backend 컴포넌트 (compactor 등)
-backend:
-  replicas: 1
-  persistence:
-    enabled: true
-    size: 10Gi
-    storageClass: local-path
-  resources:
-    limits:
-      cpu: 500m
-      memory: 1Gi
-    requests:
-      cpu: 100m
-      memory: 256Mi
-
-# Gateway (Nginx - 선택적)
-gateway:
-  enabled: true
-  replicas: 1
-  resources:
-    limits:
-      cpu: 200m
-      memory: 256Mi
-    requests:
-      cpu: 50m
-      memory: 128Mi
-
-# 단일 바이너리 모드 비활성화
-singleBinary:
+# Write/Read/Backend 컴포넌트 비활성화 (SingleBinary 모드에서는 불필요)
+write:
   replicas: 0
+
+read:
+  replicas: 0
+
+backend:
+  replicas: 0
+
+# Gateway 비활성화 (SingleBinary 직접 접근)
+gateway:
+  enabled: false
 
 # 모니터링
 monitoring:
