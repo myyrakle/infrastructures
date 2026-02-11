@@ -1,0 +1,122 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: workload-metrics
+  namespace: default
+  labels:
+    app: kube-prometheus-stack
+    app.kubernetes.io/instance: prometheus
+    app.kubernetes.io/part-of: kube-prometheus-stack
+    release: prometheus
+spec:
+  groups:
+  - name: workload.rules
+    interval: 30s
+    rules:
+    # CPU 사용량 (workload별)
+    - record: namespace_workload_pod_container:container_cpu_usage_seconds_total:sum_rate5m
+      expr: |
+        max by (namespace, workload, workload_type, pod, container) (
+          node_namespace_pod_container:container_cpu_usage_seconds_total:sum_rate5m
+          * on (namespace, pod) group_left(workload, workload_type)
+          namespace_workload_pod:kube_pod_owner:relabel
+        )
+
+    # Memory 사용량 (workload별)
+    - record: namespace_workload_pod_container:container_memory_working_set_bytes
+      expr: |
+        max by (namespace, workload, workload_type, pod, container) (
+          container_memory_working_set_bytes{job="kubelet", metrics_path="/metrics/cadvisor", image!=""}
+          * on (namespace, pod) group_left(workload, workload_type)
+          namespace_workload_pod:kube_pod_owner:relabel
+        )
+
+    # Memory cache (workload별)
+    - record: namespace_workload_pod_container:container_memory_cache
+      expr: |
+        max by (namespace, workload, workload_type, pod, container) (
+          container_memory_cache{job="kubelet", metrics_path="/metrics/cadvisor", image!=""}
+          * on (namespace, pod) group_left(workload, workload_type)
+          namespace_workload_pod:kube_pod_owner:relabel
+        )
+
+    # Memory RSS (workload별)
+    - record: namespace_workload_pod_container:container_memory_rss
+      expr: |
+        max by (namespace, workload, workload_type, pod, container) (
+          container_memory_rss{job="kubelet", metrics_path="/metrics/cadvisor", image!=""}
+          * on (namespace, pod) group_left(workload, workload_type)
+          namespace_workload_pod:kube_pod_owner:relabel
+        )
+
+    # CPU requests (workload별)
+    - record: namespace_workload_pod_container:kube_pod_container_resource_requests_cpu_cores
+      expr: |
+        max by (namespace, workload, workload_type, pod, container) (
+          kube_pod_container_resource_requests{job="kube-state-metrics", resource="cpu"}
+          * on (namespace, pod) group_left(workload, workload_type)
+          namespace_workload_pod:kube_pod_owner:relabel
+        )
+
+    # CPU limits (workload별)
+    - record: namespace_workload_pod_container:kube_pod_container_resource_limits_cpu_cores
+      expr: |
+        max by (namespace, workload, workload_type, pod, container) (
+          kube_pod_container_resource_limits{job="kube-state-metrics", resource="cpu"}
+          * on (namespace, pod) group_left(workload, workload_type)
+          namespace_workload_pod:kube_pod_owner:relabel
+        )
+
+    # Memory requests (workload별)
+    - record: namespace_workload_pod_container:kube_pod_container_resource_requests_memory_bytes
+      expr: |
+        max by (namespace, workload, workload_type, pod, container) (
+          kube_pod_container_resource_requests{job="kube-state-metrics", resource="memory"}
+          * on (namespace, pod) group_left(workload, workload_type)
+          namespace_workload_pod:kube_pod_owner:relabel
+        )
+
+    # Memory limits (workload별)
+    - record: namespace_workload_pod_container:kube_pod_container_resource_limits_memory_bytes
+      expr: |
+        max by (namespace, workload, workload_type, pod, container) (
+          kube_pod_container_resource_limits{job="kube-state-metrics", resource="memory"}
+          * on (namespace, pod) group_left(workload, workload_type)
+          namespace_workload_pod:kube_pod_owner:relabel
+        )
+
+    # Network RX (workload별)
+    - record: namespace_workload_pod_container:container_network_receive_bytes_total
+      expr: |
+        max by (namespace, workload, workload_type, pod, interface) (
+          rate(container_network_receive_bytes_total{job="kubelet", metrics_path="/metrics/cadvisor"}[5m])
+          * on (namespace, pod) group_left(workload, workload_type)
+          namespace_workload_pod:kube_pod_owner:relabel
+        )
+
+    # Network TX (workload별)
+    - record: namespace_workload_pod_container:container_network_transmit_bytes_total
+      expr: |
+        max by (namespace, workload, workload_type, pod, interface) (
+          rate(container_network_transmit_bytes_total{job="kubelet", metrics_path="/metrics/cadvisor"}[5m])
+          * on (namespace, pod) group_left(workload, workload_type)
+          namespace_workload_pod:kube_pod_owner:relabel
+        )
+
+    # Disk reads (workload별)
+    - record: namespace_workload_pod_container:container_fs_reads_bytes_total
+      expr: |
+        max by (namespace, workload, workload_type, pod, device) (
+          rate(container_fs_reads_bytes_total{job="kubelet", metrics_path="/metrics/cadvisor", device=~".*"}[5m])
+          * on (namespace, pod) group_left(workload, workload_type)
+          namespace_workload_pod:kube_pod_owner:relabel
+        )
+
+    # Disk writes (workload별)
+    - record: namespace_workload_pod_container:container_fs_writes_bytes_total
+      expr: |
+        max by (namespace, workload, workload_type, pod, device) (
+          rate(container_fs_writes_bytes_total{job="kubelet", metrics_path="/metrics/cadvisor", device=~".*"}[5m])
+          * on (namespace, pod) group_left(workload, workload_type)
+          namespace_workload_pod:kube_pod_owner:relabel
+        )
