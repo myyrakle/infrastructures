@@ -15,9 +15,11 @@
       }
     ]
   },
+  "description": "App(Deployment) 단위의 메트릭을 정리해서 보여주는 대시보드입니다.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
+  "id": 35,
   "links": [
     {
       "asDropdown": true,
@@ -604,7 +606,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (pod, workload) (\n  namespace_workload_pod_container:container_cpu_usage_seconds_total:sum_rate5m{namespace=\"$namespace\", workload=~\"$app\"}\n)",
+          "expr": "sum by (pod, workload) (last_over_time(namespace_workload_pod_container:container_cpu_usage_seconds_total:sum_rate5m{namespace=\"$namespace\", workload=~\"$app\"}[1h]))",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -615,7 +617,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (pod, workload) (namespace_workload_pod_container:kube_pod_container_resource_requests_cpu_cores{namespace=\"$namespace\", workload=~\"$app\"})",
+          "expr": "sum by (pod, workload) (last_over_time(namespace_workload_pod_container:kube_pod_container_resource_requests_cpu_cores{namespace=\"$namespace\", workload=~\"$app\"}[1h]))",
           "format": "table",
           "instant": true,
           "refId": "B"
@@ -626,7 +628,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (pod, workload) (namespace_workload_pod_container:container_cpu_usage_seconds_total:sum_rate5m{namespace=\"$namespace\", workload=~\"$app\"}) / sum by (pod, workload) (namespace_workload_pod_container:kube_pod_container_resource_requests_cpu_cores{namespace=\"$namespace\", workload=~\"$app\"})",
+          "expr": "sum by (pod, workload) (last_over_time(namespace_workload_pod_container:container_cpu_usage_seconds_total:sum_rate5m{namespace=\"$namespace\", workload=~\"$app\"}[1h])) / sum by (pod, workload) (last_over_time(namespace_workload_pod_container:kube_pod_container_resource_requests_cpu_cores{namespace=\"$namespace\", workload=~\"$app\"}[1h]))",
           "format": "table",
           "instant": true,
           "refId": "C"
@@ -637,7 +639,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (pod, workload) (namespace_workload_pod_container:kube_pod_container_resource_limits_cpu_cores{namespace=\"$namespace\", workload=~\"$app\"})",
+          "expr": "sum by (pod, workload) (last_over_time(namespace_workload_pod_container:kube_pod_container_resource_limits_cpu_cores{namespace=\"$namespace\", workload=~\"$app\"}[1h]))",
           "format": "table",
           "instant": true,
           "refId": "D"
@@ -648,7 +650,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (pod, workload) (namespace_workload_pod_container:container_cpu_usage_seconds_total:sum_rate5m{namespace=\"$namespace\", workload=~\"$app\"}) / sum by (pod, workload) (namespace_workload_pod_container:kube_pod_container_resource_limits_cpu_cores{namespace=\"$namespace\", workload=~\"$app\"})",
+          "expr": "sum by (pod, workload) (last_over_time(namespace_workload_pod_container:container_cpu_usage_seconds_total:sum_rate5m{namespace=\"$namespace\", workload=~\"$app\"}[1h])) / sum by (pod, workload) (last_over_time(namespace_workload_pod_container:kube_pod_container_resource_limits_cpu_cores{namespace=\"$namespace\", workload=~\"$app\"}[1h]))",
           "format": "table",
           "instant": true,
           "refId": "E"
@@ -663,6 +665,28 @@
           "format": "table",
           "instant": true,
           "refId": "F"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "count by(namespace, pod, workload) (last_over_time(namespace_workload_pod:kube_pod_owner:relabel{namespace=\"$namespace\", workload=~\"$app\"}[1h]))",
+          "format": "table",
+          "instant": true,
+          "refId": "G"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "kube_pod_info{namespace=\"$namespace\"} * on(namespace, pod) group_left(workload) namespace_workload_pod:kube_pod_owner:relabel{namespace=\"$namespace\", workload=~\"$app\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "H"
         }
       ],
       "title": "CPU Quota",
@@ -685,12 +709,117 @@
               "Time 4": true,
               "Time 5": true,
               "Time 6": true,
+              "Time 7": true,
+              "Time 8": true,
+              "Value #G": true,
+              "Value #H": true,
+              "container 1": true,
+              "container 2": true,
+              "container 3": true,
+              "container 4": true,
+              "container 5": true,
+              "container 6": true,
+              "container 7": true,
+              "container 8": true,
+              "created_by_kind": true,
+              "created_by_kind 1": true,
+              "created_by_kind 10": true,
+              "created_by_kind 2": true,
+              "created_by_kind 3": true,
+              "created_by_kind 4": true,
+              "created_by_kind 5": true,
+              "created_by_kind 6": true,
+              "created_by_kind 7": true,
+              "created_by_kind 8": true,
+              "created_by_kind 9": true,
+              "created_by_name": true,
+              "created_by_name 1": true,
+              "created_by_name 2": true,
+              "created_by_name 3": true,
+              "created_by_name 4": true,
+              "created_by_name 5": true,
+              "created_by_name 6": true,
+              "created_by_name 7": true,
+              "created_by_name 8": true,
+              "endpoint 1": true,
+              "endpoint 2": true,
+              "endpoint 3": true,
+              "endpoint 4": true,
+              "endpoint 5": true,
+              "endpoint 6": true,
+              "endpoint 7": true,
+              "endpoint 8": true,
+              "host_ip": true,
+              "host_ip 1": true,
+              "host_ip 10": true,
+              "host_ip 2": true,
+              "host_ip 3": true,
+              "host_ip 4": true,
+              "host_ip 5": true,
+              "host_ip 6": true,
+              "host_ip 7": true,
+              "host_ip 8": true,
+              "host_ip 9": true,
+              "host_network": true,
+              "host_network 1": true,
+              "host_network 2": true,
+              "host_network 3": true,
+              "host_network 4": true,
+              "host_network 5": true,
+              "host_network 6": true,
+              "host_network 7": true,
+              "host_network 8": true,
+              "instance": true,
+              "job 1": true,
+              "job 2": true,
+              "job 3": true,
+              "job 4": true,
+              "job 5": true,
+              "job 6": true,
+              "job 7": true,
+              "job 8": true,
               "namespace": true,
+              "phase": true,
+              "phase 1": true,
+              "phase 2": true,
+              "phase 3": true,
+              "phase 4": true,
+              "phase 5": true,
+              "phase 6": true,
+              "phase 7": true,
+              "phase 8": true,
+              "pod_ip": true,
+              "pod_ip 1": true,
+              "pod_ip 2": true,
+              "pod_ip 3": true,
+              "pod_ip 4": true,
+              "pod_ip 5": true,
+              "pod_ip 6": true,
+              "pod_ip 7": true,
+              "pod_ip 8": true,
+              "service 1": true,
+              "service 2": true,
+              "service 3": true,
+              "service 4": true,
+              "service 5": true,
+              "service 6": true,
+              "service 7": true,
+              "service 8": true,
+              "uid 1": true,
+              "uid 2": true,
+              "uid 3": true,
+              "uid 4": true,
+              "uid 5": true,
+              "uid 6": true,
+              "uid 7": true,
+              "uid 8": true,
               "workload 1": true,
               "workload 2": true,
               "workload 3": true,
               "workload 4": true,
-              "workload 5": true
+              "workload 5": true,
+              "workload 6": true,
+              "workload 7": true
             },
             "indexByName": {
               "Time 1": 1,
@@ -699,14 +828,16 @@
               "Time 4": 4,
               "Time 5": 5,
               "Time 6": 6,
-              "Value #A": 9,
-              "Value #B": 10,
-              "Value #C": 11,
-              "Value #D": 12,
-              "Value #E": 13,
-              "Value #F": 8,
+              "Time 7": 7,
+              "Value #A": 10,
+              "Value #B": 11,
+              "Value #C": 12,
+              "Value #D": 13,
+              "Value #E": 14,
+              "Value #F": 9,
+              "node": 1,
               "pod": 0,
-              "workload": 7
+              "workload": 8
             },
             "renameByName": {
               "Value #A": "CPU Usage",
@@ -715,6 +846,7 @@
               "Value #D": "CPU Limits",
               "Value #E": "CPU Limits %",
               "Value #F": "Status",
+              "node": "Node",
               "pod": "Pod",
               "workload": "Workload"
             }
@@ -1019,6 +1151,10 @@
               {
                 "id": "unit",
                 "value": "none"
+              },
+              {
+                "id": "custom.width",
+                "value": 56
               }
             ]
           }
@@ -1042,7 +1178,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (pod, workload) (namespace_workload_pod_container:container_memory_working_set_bytes{namespace=\"$namespace\", workload=~\"$app\"})",
+          "expr": "sum by (pod, workload) (last_over_time(namespace_workload_pod_container:container_memory_working_set_bytes{namespace=\"$namespace\", workload=~\"$app\"}[1h]))",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -1052,7 +1188,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (pod, workload) (namespace_workload_pod_container:kube_pod_container_resource_requests_memory_bytes{namespace=\"$namespace\", workload=~\"$app\"})",
+          "expr": "sum by (pod, workload) (last_over_time(namespace_workload_pod_container:kube_pod_container_resource_requests_memory_bytes{namespace=\"$namespace\", workload=~\"$app\"}[1h]))",
           "format": "table",
           "instant": true,
           "refId": "B"
@@ -1062,7 +1198,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (pod, workload) (namespace_workload_pod_container:container_memory_working_set_bytes{namespace=\"$namespace\", workload=~\"$app\"}) / sum by (pod, workload) (namespace_workload_pod_container:kube_pod_container_resource_requests_memory_bytes{namespace=\"$namespace\", workload=~\"$app\"})",
+          "expr": "sum by (pod, workload) (last_over_time(namespace_workload_pod_container:container_memory_working_set_bytes{namespace=\"$namespace\", workload=~\"$app\"}[1h])) / sum by (pod, workload) (last_over_time(namespace_workload_pod_container:kube_pod_container_resource_requests_memory_bytes{namespace=\"$namespace\", workload=~\"$app\"}[1h]))",
           "format": "table",
           "instant": true,
           "refId": "C"
@@ -1072,7 +1208,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (pod, workload) (namespace_workload_pod_container:kube_pod_container_resource_limits_memory_bytes{namespace=\"$namespace\", workload=~\"$app\"})",
+          "expr": "sum by (pod, workload) (last_over_time(namespace_workload_pod_container:kube_pod_container_resource_limits_memory_bytes{namespace=\"$namespace\", workload=~\"$app\"}[1h]))",
           "format": "table",
           "instant": true,
           "refId": "D"
@@ -1082,7 +1218,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (pod, workload) (namespace_workload_pod_container:container_memory_working_set_bytes{namespace=\"$namespace\", workload=~\"$app\"}) / sum by (pod, workload) (namespace_workload_pod_container:kube_pod_container_resource_limits_memory_bytes{namespace=\"$namespace\", workload=~\"$app\"})",
+          "expr": "sum by (pod, workload) (last_over_time(namespace_workload_pod_container:container_memory_working_set_bytes{namespace=\"$namespace\", workload=~\"$app\"}[1h])) / sum by (pod, workload) (last_over_time(namespace_workload_pod_container:kube_pod_container_resource_limits_memory_bytes{namespace=\"$namespace\", workload=~\"$app\"}[1h]))",
           "format": "table",
           "instant": true,
           "refId": "E"
@@ -1092,7 +1228,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (pod, workload) (namespace_workload_pod_container:container_memory_rss{namespace=\"$namespace\", workload=~\"$app\"})",
+          "expr": "sum by (pod, workload) (last_over_time(namespace_workload_pod_container:container_memory_rss{namespace=\"$namespace\", workload=~\"$app\"}[1h]))",
           "format": "table",
           "instant": true,
           "refId": "F"
@@ -1102,7 +1238,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (pod, workload) (namespace_workload_pod_container:container_memory_cache{namespace=\"$namespace\", workload=~\"$app\"})",
+          "expr": "sum by (pod, workload) (last_over_time(namespace_workload_pod_container:container_memory_cache{namespace=\"$namespace\", workload=~\"$app\"}[1h]))",
           "format": "table",
           "instant": true,
           "refId": "G"
@@ -1112,7 +1248,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (workload) (max by (namespace, pod, container, workload) (container_memory_swap{job=\"kubelet\", metrics_path=\"/metrics/cadvisor\", namespace=\"$namespace\", container!=\"\"} * on (namespace, pod) group_left(workload) namespace_workload_pod:kube_pod_owner:relabel{workload=~\"$app\"}))",
+          "expr": "sum by (workload) (max by (namespace, pod, container, workload) (last_over_time(container_memory_swap{job=\"kubelet\", metrics_path=\"/metrics/cadvisor\", namespace=\"$namespace\", container!=\"\"}[1h]) * on (namespace, pod) group_left(workload) namespace_workload_pod:kube_pod_owner:relabel{workload=~\"$app\"}))",
           "format": "table",
           "instant": true,
           "refId": "H"
@@ -1126,6 +1262,28 @@
           "format": "table",
           "instant": true,
           "refId": "I"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "count by(namespace, pod, workload) (last_over_time(namespace_workload_pod:kube_pod_owner:relabel{namespace=\"$namespace\", workload=~\"$app\"}[1h]))",
+          "format": "table",
+          "instant": true,
+          "refId": "J"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "kube_pod_info{namespace=\"$namespace\"} * on(namespace, pod) group_left(workload) namespace_workload_pod:kube_pod_owner:relabel{namespace=\"$namespace\", workload=~\"$app\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "K"
         }
       ],
       "title": "Memory Quota",
@@ -1143,6 +1301,8 @@
             "excludeByName": {
               "Time": true,
               "Time 1": true,
+              "Time 10": true,
+              "Time 11": true,
               "Time 2": true,
               "Time 3": true,
               "Time 4": true,
@@ -1151,15 +1311,136 @@
               "Time 7": true,
               "Time 8": true,
               "Time 9": true,
+              "Value #J": true,
+              "Value #K": true,
+              "container 1": true,
+              "container 10": true,
+              "container 2": true,
+              "container 3": true,
+              "container 4": true,
+              "container 5": true,
+              "container 6": true,
+              "container 7": true,
+              "container 8": true,
+              "container 9": true,
+              "created_by_kind": true,
+              "created_by_kind 1": true,
+              "created_by_kind 10": true,
+              "created_by_kind 2": true,
+              "created_by_kind 3": true,
+              "created_by_kind 4": true,
+              "created_by_kind 5": true,
+              "created_by_kind 6": true,
+              "created_by_kind 7": true,
+              "created_by_kind 8": true,
+              "created_by_kind 9": true,
+              "created_by_name": true,
+              "created_by_name 1": true,
+              "created_by_name 10": true,
+              "created_by_name 2": true,
+              "created_by_name 3": true,
+              "created_by_name 4": true,
+              "created_by_name 5": true,
+              "created_by_name 6": true,
+              "created_by_name 7": true,
+              "created_by_name 8": true,
+              "created_by_name 9": true,
+              "endpoint 1": true,
+              "endpoint 10": true,
+              "endpoint 2": true,
+              "endpoint 3": true,
+              "endpoint 4": true,
+              "endpoint 5": true,
+              "endpoint 6": true,
+              "endpoint 7": true,
+              "endpoint 8": true,
+              "endpoint 9": true,
+              "host_ip": true,
+              "host_ip 1": true,
+              "host_ip 10": true,
+              "host_ip 2": true,
+              "host_ip 3": true,
+              "host_ip 4": true,
+              "host_ip 5": true,
+              "host_ip 6": true,
+              "host_ip 7": true,
+              "host_ip 8": true,
+              "host_ip 9": true,
+              "host_network": true,
+              "host_network 1": true,
+              "host_network 10": true,
+              "host_network 2": true,
+              "host_network 3": true,
+              "host_network 4": true,
+              "host_network 5": true,
+              "host_network 6": true,
+              "host_network 7": true,
+              "host_network 8": true,
+              "host_network 9": true,
+              "instance": true,
+              "job 1": true,
+              "job 10": true,
+              "job 2": true,
+              "job 3": true,
+              "job 4": true,
+              "job 5": true,
+              "job 6": true,
+              "job 7": true,
+              "job 8": true,
+              "job 9": true,
               "namespace": true,
+              "phase": true,
+              "phase 1": true,
+              "phase 10": true,
+              "phase 2": true,
+              "phase 3": true,
+              "phase 4": true,
+              "phase 5": true,
+              "phase 6": true,
+              "phase 7": true,
+              "phase 8": true,
+              "phase 9": true,
+              "pod_ip": true,
+              "pod_ip 1": true,
+              "pod_ip 10": true,
+              "pod_ip 2": true,
+              "pod_ip 3": true,
+              "pod_ip 4": true,
+              "pod_ip 5": true,
+              "pod_ip 6": true,
+              "pod_ip 7": true,
+              "pod_ip 8": true,
+              "pod_ip 9": true,
+              "service 1": true,
+              "service 10": true,
+              "service 2": true,
+              "service 3": true,
+              "service 4": true,
+              "service 5": true,
+              "service 6": true,
+              "service 7": true,
+              "service 8": true,
+              "service 9": true,
+              "uid 1": true,
+              "uid 10": true,
+              "uid 2": true,
+              "uid 3": true,
+              "uid 4": true,
+              "uid 5": true,
+              "uid 6": true,
+              "uid 7": true,
+              "uid 8": true,
+              "uid 9": true,
               "workload 1": true,
+              "workload 10": true,
               "workload 2": true,
               "workload 3": true,
               "workload 4": true,
               "workload 5": true,
               "workload 6": true,
               "workload 7": true,
-              "workload 8": true
+              "workload 8": true,
+              "workload 9": true
             },
             "indexByName": {
               "Time 1": 1,
@@ -1171,17 +1452,18 @@
               "Time 7": 7,
               "Time 8": 8,
               "Time 9": 9,
-              "Value #A": 12,
-              "Value #B": 13,
-              "Value #C": 14,
-              "Value #D": 15,
-              "Value #E": 16,
-              "Value #F": 17,
-              "Value #G": 18,
-              "Value #H": 19,
-              "Value #I": 11,
+              "Value #A": 13,
+              "Value #B": 14,
+              "Value #C": 15,
+              "Value #D": 16,
+              "Value #E": 17,
+              "Value #F": 18,
+              "Value #G": 19,
+              "Value #H": 20,
+              "Value #I": 12,
+              "node": 1,
               "pod": 0,
-              "workload": 10
+              "workload": 11
             },
             "renameByName": {
               "Value #A": "Memory Usage",
@@ -1193,6 +1475,7 @@
               "Value #G": "Memory Usage (Cache)",
               "Value #H": "Memory Usage (Swap)",
               "Value #I": "Status",
+              "node": "Node",
               "pod": "Pod",
               "workload": "Workload"
             }
@@ -1308,6 +1591,34 @@
               {
                 "id": "unit",
                 "value": "none"
+              },
+              {
+                "id": "custom.width",
+                "value": 85
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Pod"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 328
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Node"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 133
               }
             ]
           }
@@ -1322,7 +1633,13 @@
       "id": 9,
       "options": {
         "cellHeight": "sm",
-        "showHeader": true
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "phase"
+          }
+        ]
       },
       "pluginVersion": "12.3.1",
       "targets": [
@@ -1331,7 +1648,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (pod, workload) (8 * namespace_workload_pod_container:container_network_receive_bytes_total{namespace=\"$namespace\", workload=~\"$app\"})",
+          "expr": "sum by (pod, workload) (8 * last_over_time(namespace_workload_pod_container:container_network_receive_bytes_total{namespace=\"$namespace\", workload=~\"$app\"}[1h]))",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -1341,7 +1658,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (pod, workload) (8 * namespace_workload_pod_container:container_network_transmit_bytes_total{namespace=\"$namespace\", workload=~\"$app\"})",
+          "expr": "sum by (pod, workload) (8 * last_over_time(namespace_workload_pod_container:container_network_transmit_bytes_total{namespace=\"$namespace\", workload=~\"$app\"}[1h]))",
           "format": "table",
           "instant": true,
           "refId": "B"
@@ -1351,7 +1668,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (pod, workload) (max by (namespace, pod, workload) (rate(container_network_receive_packets_total{job=\"kubelet\", metrics_path=\"/metrics/cadvisor\", namespace=\"$namespace\"}[$__rate_interval]) * on (namespace, pod) group_left(workload) namespace_workload_pod:kube_pod_owner:relabel{workload=~\"$app\"}))",
+          "expr": "sum by (pod, workload) (max by (namespace, pod, workload) (last_over_time(rate(container_network_receive_packets_total{job=\"kubelet\", metrics_path=\"/metrics/cadvisor\", namespace=\"$namespace\"}[$__rate_interval])[10m:]) * on (namespace, pod) group_left(workload) namespace_workload_pod:kube_pod_owner:relabel{workload=~\"$app\"}))",
           "format": "table",
           "instant": true,
           "refId": "C"
@@ -1361,7 +1678,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (pod, workload) (max by (namespace, pod, workload) (rate(container_network_transmit_packets_total{job=\"kubelet\", metrics_path=\"/metrics/cadvisor\", namespace=\"$namespace\"}[$__rate_interval]) * on (namespace, pod) group_left(workload) namespace_workload_pod:kube_pod_owner:relabel{workload=~\"$app\"}))",
+          "expr": "sum by (pod, workload) (max by (namespace, pod, workload) (last_over_time(rate(container_network_transmit_packets_total{job=\"kubelet\", metrics_path=\"/metrics/cadvisor\", namespace=\"$namespace\"}[$__rate_interval])[10m:]) * on (namespace, pod) group_left(workload) namespace_workload_pod:kube_pod_owner:relabel{workload=~\"$app\"}))",
           "format": "table",
           "instant": true,
           "refId": "D"
@@ -1371,7 +1688,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (pod, workload) (max by (namespace, pod, workload) (rate(container_network_receive_packets_dropped_total{job=\"kubelet\", metrics_path=\"/metrics/cadvisor\", namespace=\"$namespace\"}[$__rate_interval]) * on (namespace, pod) group_left(workload) namespace_workload_pod:kube_pod_owner:relabel{workload=~\"$app\"}))",
+          "expr": "sum by (pod, workload) (max by (namespace, pod, workload) (last_over_time(rate(container_network_receive_packets_dropped_total{job=\"kubelet\", metrics_path=\"/metrics/cadvisor\", namespace=\"$namespace\"}[$__rate_interval])[10m:]) * on (namespace, pod) group_left(workload) namespace_workload_pod:kube_pod_owner:relabel{workload=~\"$app\"}))",
           "format": "table",
           "instant": true,
           "refId": "E"
@@ -1381,7 +1698,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (pod, workload) (max by (namespace, pod, workload) (rate(container_network_transmit_packets_dropped_total{job=\"kubelet\", metrics_path=\"/metrics/cadvisor\", namespace=\"$namespace\"}[$__rate_interval]) * on (namespace, pod) group_left(workload) namespace_workload_pod:kube_pod_owner:relabel{workload=~\"$app\"}))",
+          "expr": "sum by (pod, workload) (max by (namespace, pod, workload) (last_over_time(rate(container_network_transmit_packets_dropped_total{job=\"kubelet\", metrics_path=\"/metrics/cadvisor\", namespace=\"$namespace\"}[$__rate_interval])[10m:]) * on (namespace, pod) group_left(workload) namespace_workload_pod:kube_pod_owner:relabel{workload=~\"$app\"}))",
           "format": "table",
           "instant": true,
           "refId": "F"
@@ -1395,6 +1712,28 @@
           "format": "table",
           "instant": true,
           "refId": "G"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "count by(namespace, pod, workload) (last_over_time(namespace_workload_pod:kube_pod_owner:relabel{namespace=\"$namespace\", workload=~\"$app\"}[1h]))",
+          "format": "table",
+          "instant": true,
+          "refId": "H"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "kube_pod_info{namespace=\"$namespace\"} * on(namespace, pod) group_left(workload) namespace_workload_pod:kube_pod_owner:relabel{namespace=\"$namespace\", workload=~\"$app\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "I"
         }
       ],
       "title": "Current Network Usage",
@@ -1418,13 +1757,128 @@
               "Time 5": true,
               "Time 6": true,
               "Time 7": true,
+              "Time 8": true,
+              "Time 9": true,
+              "Value #H": true,
+              "Value #I": true,
+              "container 1": true,
+              "container 2": true,
+              "container 3": true,
+              "container 4": true,
+              "container 5": true,
+              "container 6": true,
+              "container 7": true,
+              "container 8": true,
+              "container 9": true,
+              "created_by_kind": true,
+              "created_by_kind 1": true,
+              "created_by_kind 10": true,
+              "created_by_kind 2": true,
+              "created_by_kind 3": true,
+              "created_by_kind 4": true,
+              "created_by_kind 5": true,
+              "created_by_kind 6": true,
+              "created_by_kind 7": true,
+              "created_by_kind 8": true,
+              "created_by_kind 9": true,
+              "created_by_name": true,
+              "created_by_name 1": true,
+              "created_by_name 2": true,
+              "created_by_name 3": true,
+              "created_by_name 4": true,
+              "created_by_name 5": true,
+              "created_by_name 6": true,
+              "created_by_name 7": true,
+              "created_by_name 8": true,
+              "created_by_name 9": true,
+              "endpoint 1": true,
+              "endpoint 2": true,
+              "endpoint 3": true,
+              "endpoint 4": true,
+              "endpoint 5": true,
+              "endpoint 6": true,
+              "endpoint 7": true,
+              "endpoint 8": true,
+              "endpoint 9": true,
+              "host_ip": true,
+              "host_ip 1": true,
+              "host_ip 10": true,
+              "host_ip 2": true,
+              "host_ip 3": true,
+              "host_ip 4": true,
+              "host_ip 5": true,
+              "host_ip 6": true,
+              "host_ip 7": true,
+              "host_ip 8": true,
+              "host_ip 9": true,
+              "host_network": true,
+              "host_network 1": true,
+              "host_network 2": true,
+              "host_network 3": true,
+              "host_network 4": true,
+              "host_network 5": true,
+              "host_network 6": true,
+              "host_network 7": true,
+              "host_network 8": true,
+              "host_network 9": true,
+              "instance": true,
+              "job 1": true,
+              "job 2": true,
+              "job 3": true,
+              "job 4": true,
+              "job 5": true,
+              "job 6": true,
+              "job 7": true,
+              "job 8": true,
+              "job 9": true,
               "namespace": true,
+              "phase": true,
+              "phase 1": true,
+              "phase 2": true,
+              "phase 3": true,
+              "phase 4": true,
+              "phase 5": true,
+              "phase 6": true,
+              "phase 7": true,
+              "phase 8": true,
+              "phase 9": true,
+              "pod_ip": true,
+              "pod_ip 1": true,
+              "pod_ip 2": true,
+              "pod_ip 3": true,
+              "pod_ip 4": true,
+              "pod_ip 5": true,
+              "pod_ip 6": true,
+              "pod_ip 7": true,
+              "pod_ip 8": true,
+              "pod_ip 9": true,
+              "service 1": true,
+              "service 2": true,
+              "service 3": true,
+              "service 4": true,
+              "service 5": true,
+              "service 6": true,
+              "service 7": true,
+              "service 8": true,
+              "service 9": true,
+              "uid 1": true,
+              "uid 2": true,
+              "uid 3": true,
+              "uid 4": true,
+              "uid 5": true,
+              "uid 6": true,
+              "uid 7": true,
+              "uid 8": true,
+              "uid 9": true,
+              "workload": true,
               "workload 1": true,
               "workload 2": true,
               "workload 3": true,
               "workload 4": true,
               "workload 5": true,
-              "workload 6": true
+              "workload 6": true,
+              "workload 7": true,
+              "workload 8": true
             },
             "indexByName": {
               "Time 1": 1,
@@ -1441,8 +1895,8 @@
               "Value #E": 14,
               "Value #F": 15,
               "Value #G": 9,
-              "pod": 0,
-              "workload": 8
+              "node": 1,
+              "pod": 0
             },
             "renameByName": {
               "Value #A": "Current Receive Bandwidth",
@@ -1452,8 +1906,8 @@
               "Value #E": "Rate of Received Packets Dropped",
               "Value #F": "Rate of Transmitted Packets Dropped",
               "Value #G": "Status",
-              "pod": "Pod",
-              "workload": "Workload"
+              "node": "Node",
+              "pod": "Pod"
             }
           }
         }
@@ -2519,6 +2973,46 @@
               {
                 "id": "unit",
                 "value": "none"
+              },
+              {
+                "id": "custom.width",
+                "value": 167
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Node"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 153
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Pod"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 341
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "phase"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 224
               }
             ]
           }
@@ -2542,7 +3036,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by(pod, workload) (namespace_workload_pod_container:container_fs_reads_bytes_total{namespace=\"$namespace\", workload=~\"$app\"})",
+          "expr": "sum by(pod, workload) (container_fs_reads_bytes_total{job=\"kubelet\", metrics_path=\"/metrics/cadvisor\", namespace=\"$namespace\"} * on(namespace, pod) group_left(workload) namespace_workload_pod:kube_pod_owner:relabel{namespace=\"$namespace\", workload=~\"$app\"})",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -2552,7 +3046,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by(pod, workload) (namespace_workload_pod_container:container_fs_writes_bytes_total{namespace=\"$namespace\", workload=~\"$app\"})",
+          "expr": "sum by(pod, workload) (container_fs_writes_bytes_total{job=\"kubelet\", metrics_path=\"/metrics/cadvisor\", namespace=\"$namespace\"} * on(namespace, pod) group_left(workload) namespace_workload_pod:kube_pod_owner:relabel{namespace=\"$namespace\", workload=~\"$app\"})",
           "format": "table",
           "instant": true,
           "refId": "B"
@@ -2562,7 +3056,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by(pod, workload) (namespace_workload_pod_container:container_fs_reads_bytes_total{namespace=\"$namespace\", workload=~\"$app\"} + namespace_workload_pod_container:container_fs_writes_bytes_total{namespace=\"$namespace\", workload=~\"$app\"})",
+          "expr": "sum by(pod, workload) ((container_fs_reads_bytes_total{job=\"kubelet\", metrics_path=\"/metrics/cadvisor\", namespace=\"$namespace\"} + container_fs_writes_bytes_total{job=\"kubelet\", metrics_path=\"/metrics/cadvisor\", namespace=\"$namespace\"}) * on(namespace, pod) group_left(workload) namespace_workload_pod:kube_pod_owner:relabel{namespace=\"$namespace\", workload=~\"$app\"})",
           "format": "table",
           "instant": true,
           "refId": "C"
@@ -2572,7 +3066,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by(pod, workload) (namespace_workload_pod_container:container_fs_reads_bytes_total{namespace=\"$namespace\", workload=~\"$app\"})",
+          "expr": "sum by(pod, workload) (container_fs_reads_bytes_total{job=\"kubelet\", metrics_path=\"/metrics/cadvisor\", namespace=\"$namespace\"} * on(namespace, pod) group_left(workload) namespace_workload_pod:kube_pod_owner:relabel{namespace=\"$namespace\", workload=~\"$app\"})",
           "format": "table",
           "instant": true,
           "refId": "D"
@@ -2582,7 +3076,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by(pod, workload) (namespace_workload_pod_container:container_fs_writes_bytes_total{namespace=\"$namespace\", workload=~\"$app\"})",
+          "expr": "sum by(pod, workload) (container_fs_writes_bytes_total{job=\"kubelet\", metrics_path=\"/metrics/cadvisor\", namespace=\"$namespace\"} * on(namespace, pod) group_left(workload) namespace_workload_pod:kube_pod_owner:relabel{namespace=\"$namespace\", workload=~\"$app\"})",
           "format": "table",
           "instant": true,
           "refId": "E"
@@ -2592,7 +3086,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by(pod, workload) (namespace_workload_pod_container:container_fs_reads_bytes_total{namespace=\"$namespace\", workload=~\"$app\"} + namespace_workload_pod_container:container_fs_writes_bytes_total{namespace=\"$namespace\", workload=~\"$app\"})",
+          "expr": "sum by(pod, workload) ((container_fs_reads_bytes_total{job=\"kubelet\", metrics_path=\"/metrics/cadvisor\", namespace=\"$namespace\"} + container_fs_writes_bytes_total{job=\"kubelet\", metrics_path=\"/metrics/cadvisor\", namespace=\"$namespace\"}) * on(namespace, pod) group_left(workload) namespace_workload_pod:kube_pod_owner:relabel{namespace=\"$namespace\", workload=~\"$app\"})",
           "format": "table",
           "instant": true,
           "refId": "F"
@@ -2606,6 +3100,28 @@
           "format": "table",
           "instant": true,
           "refId": "G"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "count by(namespace, pod, workload) (last_over_time(namespace_workload_pod:kube_pod_owner:relabel{namespace=\"$namespace\", workload=~\"$app\"}[1h]))",
+          "format": "table",
+          "instant": true,
+          "refId": "H"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "kube_pod_info{namespace=\"$namespace\"} * on(namespace, pod) group_left(workload) namespace_workload_pod:kube_pod_owner:relabel{namespace=\"$namespace\", workload=~\"$app\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "I"
         }
       ],
       "title": "Current Storage IO",
@@ -2629,13 +3145,125 @@
               "Time 5": true,
               "Time 6": true,
               "Time 7": true,
+              "Time 8": true,
+              "Time 9": true,
+              "Value #H": true,
+              "Value #I": true,
+              "container 1": true,
+              "container 2": true,
+              "container 3": true,
+              "container 4": true,
+              "container 5": true,
+              "container 6": true,
+              "container 7": true,
+              "container 8": true,
+              "container 9": true,
+              "created_by_kind": true,
+              "created_by_kind 1": true,
+              "created_by_kind 10": true,
+              "created_by_kind 2": true,
+              "created_by_kind 3": true,
+              "created_by_kind 4": true,
+              "created_by_kind 5": true,
+              "created_by_kind 6": true,
+              "created_by_kind 7": true,
+              "created_by_kind 8": true,
+              "created_by_kind 9": true,
+              "created_by_name": true,
+              "created_by_name 1": true,
+              "created_by_name 2": true,
+              "created_by_name 3": true,
+              "created_by_name 4": true,
+              "created_by_name 5": true,
+              "created_by_name 6": true,
+              "created_by_name 7": true,
+              "created_by_name 8": true,
+              "created_by_name 9": true,
+              "endpoint 1": true,
+              "endpoint 2": true,
+              "endpoint 3": true,
+              "endpoint 4": true,
+              "endpoint 5": true,
+              "endpoint 6": true,
+              "endpoint 7": true,
+              "endpoint 8": true,
+              "endpoint 9": true,
+              "host_ip": true,
+              "host_ip 1": true,
+              "host_ip 10": true,
+              "host_ip 2": true,
+              "host_ip 3": true,
+              "host_ip 4": true,
+              "host_ip 5": true,
+              "host_ip 6": true,
+              "host_ip 7": true,
+              "host_ip 8": true,
+              "host_ip 9": true,
+              "host_network": true,
+              "host_network 1": true,
+              "host_network 2": true,
+              "host_network 3": true,
+              "host_network 4": true,
+              "host_network 5": true,
+              "host_network 6": true,
+              "host_network 7": true,
+              "host_network 8": true,
+              "host_network 9": true,
+              "instance": true,
+              "job 1": true,
+              "job 2": true,
+              "job 3": true,
+              "job 4": true,
+              "job 5": true,
+              "job 6": true,
+              "job 7": true,
+              "job 8": true,
+              "job 9": true,
               "namespace": true,
+              "phase": true,
+              "phase 1": true,
+              "phase 2": true,
+              "phase 3": true,
+              "phase 4": true,
+              "phase 5": true,
+              "phase 6": true,
+              "phase 7": true,
+              "phase 8": true,
+              "pod_ip": true,
+              "pod_ip 1": true,
+              "pod_ip 2": true,
+              "pod_ip 3": true,
+              "pod_ip 4": true,
+              "pod_ip 5": true,
+              "pod_ip 6": true,
+              "pod_ip 7": true,
+              "pod_ip 8": true,
+              "service 1": true,
+              "service 2": true,
+              "service 3": true,
+              "service 4": true,
+              "service 5": true,
+              "service 6": true,
+              "service 7": true,
+              "service 8": true,
+              "service 9": true,
+              "uid 1": true,
+              "uid 2": true,
+              "uid 3": true,
+              "uid 4": true,
+              "uid 5": true,
+              "uid 6": true,
+              "uid 7": true,
+              "uid 8": true,
+              "uid 9": true,
               "workload 1": true,
               "workload 2": true,
               "workload 3": true,
               "workload 4": true,
               "workload 5": true,
-              "workload 6": true
+              "workload 6": true,
+              "workload 7": true,
+              "workload 8": true
             },
             "indexByName": {
               "Time 1": 1,
@@ -2645,15 +3273,16 @@
               "Time 5": 5,
               "Time 6": 6,
               "Time 7": 7,
-              "Value #A": 10,
-              "Value #B": 11,
-              "Value #C": 12,
-              "Value #D": 13,
-              "Value #E": 14,
-              "Value #F": 15,
-              "Value #G": 9,
+              "Value #A": 11,
+              "Value #B": 12,
+              "Value #C": 13,
+              "Value #D": 14,
+              "Value #E": 15,
+              "Value #F": 16,
+              "Value #G": 10,
+              "node": 1,
               "pod": 0,
-              "workload": 8
+              "workload": 9
             },
             "renameByName": {
               "Value #A": "IOPS(Reads)",
@@ -2663,6 +3292,7 @@
               "Value #E": "Throughput(Write)",
               "Value #F": "Throughput(Read + Write)",
               "Value #G": "Status",
+              "node": "Node",
               "pod": "Pod",
               "workload": "Workload"
             }
@@ -2771,7 +3401,7 @@
   },
   "timepicker": {},
   "timezone": "utc",
-  "title": "App별 메트릭 대시보드",
+  "title": "App별 메트릭",
   "uid": "85a562078cdf77779eaa1add43cc2c1e",
-  "version": 61
+  "version": 90
 }
