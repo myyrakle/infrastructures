@@ -15,6 +15,8 @@ configs:
       insecure_skip_verify: true
 '''
 
+# one of 
 sudo systemctl restart k3s
+sudo systemctl restart k3s-agent
 
 sudo ls /var/lib/rancher/k3s/agent/etc/containerd/certs.d/
