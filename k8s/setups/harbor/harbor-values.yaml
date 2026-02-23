@@ -1,0 +1,141 @@
+# Harbor HTTP 구성 (192.168.0.8:17000)
+# processor-1 노드 전용, 최대 300GB 스토리지
+
+# ClusterIP + externalIPs 설정
+expose:
+  type: clusterIP
+  tls:
+    enabled: false  # HTTP only
+  clusterIP:
+    name: harbor
+    ports:
+      httpPort: 17000  # 외부 포트
+
+# 외부 URL
+externalURL: http://192.168.0.8:17000
+
+# 고가용성 비활성화 - 모든 컴포넌트 단일 replica
+portal:
+  replicas: 1
+  nodeSelector:
+    kubernetes.io/hostname: processor-1
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 512Mi
+      cpu: 500m
+
+core:
+  replicas: 1
+  nodeSelector:
+    kubernetes.io/hostname: processor-1
+  resources:
+    requests:
+      memory: 512Mi
+      cpu: 250m
+    limits:
+      memory: 1Gi
+      cpu: 1000m
+
+jobservice:
+  replicas: 1
+  nodeSelector:
+    kubernetes.io/hostname: processor-1
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 512Mi
+
+registry:
+  replicas: 1
+  nodeSelector:
+    kubernetes.io/hostname: processor-1
+  controller:
+    nodeSelector:
+      kubernetes.io/hostname: processor-1
+  resources:
+    requests:
+      memory: 512Mi
+      cpu: 250m
+    limits:
+      memory: 1Gi
+      cpu: 1000m
+
+# 데이터베이스 (내장 PostgreSQL)
+database:
+  type: internal
+  internal:
+    nodeSelector:
+      kubernetes.io/hostname: processor-1
+    resources:
+      requests:
+        memory: 256Mi
+        cpu: 100m
+      limits:
+        memory: 512Mi
+
+# Redis (내장)
+redis:
+  type: internal
+  internal:
+    nodeSelector:
+      kubernetes.io/hostname: processor-1
+    resources:
+      requests:
+        memory: 256Mi
+        cpu: 100m
+      limits:
+        memory: 512Mi
+
+# 스토리지 설정 (총 ~300GB)
+persistence:
+  enabled: true
+  resourcePolicy: "keep"
+  persistentVolumeClaim:
+    registry:
+      storageClass: ""  # 기본 StorageClass 사용
+      size: 250Gi  # Registry 이미지 저장소
+      accessMode: ReadWriteOnce
+    database:
+      storageClass: ""
+      size: 20Gi
+      accessMode: ReadWriteOnce
+    redis:
+      storageClass: ""
+      size: 5Gi
+      accessMode: ReadWriteOnce
+    jobservice:
+      jobLog:
+        storageClass: ""
+        size: 10Gi
+        accessMode: ReadWriteOnce
+    trivy:
+      storageClass: ""
+      size: 5Gi
+      accessMode: ReadWriteOnce
+
+# 불필요한 컴포넌트 비활성화
+trivy:
+  enabled: false  # 취약점 스캐너 비활성화
+notary:
+  enabled: false  # 이미지 서명 비활성화
+chartmuseum:
+  enabled: false  # Helm Chart 저장소 비활성화
+
+# 기본 관리자 비밀번호
+harborAdminPassword: "Harbor12345"  # 설치 후 변경 권장!
+
+# Nginx 설정
+nginx:
+  nodeSelector:
+    kubernetes.io/hostname: processor-1
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 512Mi
