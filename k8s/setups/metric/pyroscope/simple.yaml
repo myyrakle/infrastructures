@@ -6,7 +6,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: pyroscope
-  namespace: monitoring
+  namespace: default
   labels:
     app: pyroscope
 spec:
@@ -51,16 +51,18 @@ spec:
               mountPath: /var/lib/pyroscope
           livenessProbe:
             httpGet:
-              path: /healthz
+              path: /ready
               port: 4040
             initialDelaySeconds: 30
             periodSeconds: 10
           readinessProbe:
             httpGet:
-              path: /healthz
+              path: /ready
               port: 4040
-            initialDelaySeconds: 10
+            initialDelaySeconds: 30
             periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 6
       volumes:
         - name: pyroscope-data
           hostPath:
@@ -73,7 +75,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: pyroscope
-  namespace: monitoring
+  namespace: default
   labels:
     app: pyroscope
 spec:
