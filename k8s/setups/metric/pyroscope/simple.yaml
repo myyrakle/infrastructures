@@ -1,0 +1,89 @@
+---
+# Pyroscope 프로파일링 서버
+# 데이터 보존: 50GB, 30일
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pyroscope
+  namespace: monitoring
+  labels:
+    app: pyroscope
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: pyroscope
+  template:
+    metadata:
+      labels:
+        app: pyroscope
+    spec:
+      containers:
+        - name: pyroscope
+          image: grafana/pyroscope:latest
+          args:
+            - "server"
+            # 데이터 보존 기간 (30일)
+            - "--storage.tsdb.retention-duration=30d"
+            # 스토리지 경로
+            - "--storage.tsdb.path=/var/lib/pyroscope"
+            # 최대 블록 기간
+            - "--storage.tsdb.max-block-duration=2h"
+          ports:
+            - name: http
+              containerPort: 4040
+              protocol: TCP
+          env:
+            - name: PYROSCOPE_LOG_LEVEL
+              value: "info"
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+          volumeMounts:
+            - name: pyroscope-data
+              mountPath: /var/lib/pyroscope
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 4040
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 4040
+            initialDelaySeconds: 10
+            periodSeconds: 5
+      volumes:
+        - name: pyroscope-data
+          hostPath:
+            path: /data/pyroscope # 로컬 디스크 경로
+            type: DirectoryOrCreate
+      nodeName: processor-1
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pyroscope
+  namespace: monitoring
+  labels:
+    app: pyroscope
+spec:
+  type: ClusterIP
+  externalIPs:
+    - 192.168.0.8
+  selector:
+    app: pyroscope
+  ports:
+    - name: http
+      port: 44443
+      targetPort: 4040
+      protocol: TCP
