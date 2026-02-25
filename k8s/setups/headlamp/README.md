@@ -16,3 +16,8 @@ open service
 kubectl patch svc headlamp -n kube-system --type=json -p='[{"op": "replace", "path": "/spec/ports", "value": [{"name":"default", "port":17200, "targetPort": 4466, "protocol": "TCP"}]}]'
 kubectl patch svc headlamp -n kube-system -p '{"spec": {"type":"ClusterIP", "externalIPs": ["192.168.0.8"]}}'
 ```
+
+get ID Token 
+```bash
+kubectl create token headlamp --namespace kube-system
+```
