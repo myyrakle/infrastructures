@@ -1499,10 +1499,10 @@
       {
         "current": {
           "text": [
-            "ai-11"
+            "All"
           ],
           "value": [
-            "ai-11"
+            "$__all"
           ]
         },
         "datasource": "prometheus",
