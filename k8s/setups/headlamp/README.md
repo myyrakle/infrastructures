@@ -21,3 +21,17 @@ get ID Token
 ```bash
 kubectl create token headlamp --namespace kube-system
 ```
+
+## Create Read-Only User
+
+```bash
+kubectl apply -f read-only-role.yaml
+kubectl create serviceaccount headlamp-readonly -n kube-system
+kubectl create clusterrolebinding headlamp-read-only-binding \
+  --clusterrole=headlamp-readonly \
+  --serviceaccount=kube-system:headlamp-readonly \
+  -n kube-system
+
+kubectl apply -f headlamp-readonly-token.yaml
+kubectl get secret headlamp-readonly-token -n kube-system -o jsonpath='{.data.token}' | base64 -d
+```
