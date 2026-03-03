@@ -1240,7 +1240,7 @@
               "Hostname": "Node",
               "exported_namespace": "Namespace",
               "exported_pod": "Pod",
-              "gpu": "GPU ID",
+              "gpu": "GPU Index",
               "modelName": "GPU Model"
             }
           }
@@ -1511,12 +1511,12 @@
     ]
   },
   "time": {
-    "from": "now-24h",
+    "from": "now-30m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "NVIDIA GPU Dashboard",
   "uid": "Oxed_c6Wz",
-  "version": 25
+  "version": 26
 }
