@@ -1,0 +1,50 @@
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: uniqueexternalipport
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    description: >
+      Prevents multiple Services from sharing the same externalIP port,
+      which causes unpredictable traffic routing in k3s/kube-proxy.
+spec:
+  crd:
+    spec:
+      names:
+        kind: UniqueExternalIPPort
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      code:
+        - engine: Rego
+          source:
+            rego: |
+              package uniqueexternalipport
+
+              violation[{"msg": msg}] {
+                incoming := input.review.object
+
+                # Only apply to Services that have externalIPs
+                incoming.spec.externalIPs
+
+                port := incoming.spec.ports[_].port
+
+                # Iterate over every Service in every namespace cached by Gatekeeper
+                existing := data.inventory.namespace[ns]["v1"]["Service"][existing_name]
+
+                # Skip self (update scenario)
+                not is_same_service(incoming, existing_name, ns)
+
+                # Conflict: same port
+                existing.spec.externalIPs
+                existing.spec.ports[_].port == port
+
+                msg := sprintf(
+                  "port %v is already used by Service %v/%v",
+                  [port, ns, existing_name]
+                )
+              }
+
+              is_same_service(incoming, existing_name, existing_ns) {
+                incoming.metadata.name      == existing_name
+                incoming.metadata.namespace == existing_ns
+              }
