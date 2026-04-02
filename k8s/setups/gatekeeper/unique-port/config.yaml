@@ -1,0 +1,13 @@
+# Gatekeeper Config: sync Services into the OPA cache so that
+# data.inventory can be used for cross-resource uniqueness checks.
+apiVersion: config.gatekeeper.sh/v1alpha1
+kind: Config
+metadata:
+  name: config
+  namespace: gatekeeper-system
+spec:
+  sync:
+    syncOnly:
+      - group: ""
+        version: "v1"
+        kind: Service
