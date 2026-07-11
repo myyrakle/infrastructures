@@ -1,0 +1,53 @@
+extensions:
+  # ECS healthCheck 용 HTTP 헬스 엔드포인트. 파이프라인 기동 상태를 반환한다.
+  # 이미지의 /busybox wget 이 이 엔드포인트를 찔러 컨테이너 HEALTHY 를 판정한다.
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  # FireLens(Fluent Bit)의 forward 출력을 수신. awsvpc 네트워크라 localhost 공유.
+  fluentforward:
+    endpoint: 0.0.0.0:8006
+
+processors:
+  transform:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          # FireLens enable-ecs-log-metadata 가 넣어주는 ecs_task_arn 을 Resource 로 승격
+          - set(resource.attributes["aws.ecs.task.arn"], attributes["ecs_task_arn"]) where attributes["ecs_task_arn"] != nil
+          # 앱 stdout JSON 을 파싱해 필드를 attributes 로 병합 (msg/level/trace_id/span_id 등)
+          - merge_maps(attributes, ParseJSON(attributes["log"]), "upsert") where attributes["log"] != nil and IsMatch(attributes["log"], "^\\s*\\{")
+          # 앱 로그 원문은 Body 로 유지
+          - set(body, attributes["log"]) where attributes["log"] != nil
+          # trace 상관: 앱(observability.NewSlogHandler)이 남긴 trace_id/span_id(hex)를
+          # LogRecord 의 TraceId/SpanId 로 승격 → ClickStack 로그↔트레이스 연결
+          - set(trace_id.string, attributes["trace_id"]) where attributes["trace_id"] != nil
+          - set(span_id.string, attributes["span_id"]) where attributes["span_id"] != nil
+          # severity: slog level(INFO/WARN/ERROR...)을 SeverityText 로
+          - set(severity_text, attributes["level"]) where attributes["level"] != nil
+  resource:
+    attributes:
+      - key: service.name
+        value: ${env:OTEL_SERVICE_NAME}
+        action: upsert
+      - key: deployment.environment
+        value: ${env:DEPLOY_ENV}
+        action: upsert
+  batch:
+    timeout: 5s
+
+exporters:
+  otlphttp:
+    logs_endpoint: ${env:OTEL_EXPORTER_OTLP_ENDPOINT}/v1/logs
+    headers:
+      authorization: ${env:OTEL_INGESTION_KEY}
+
+service:
+  extensions: [health_check]
+  pipelines:
+    logs:
+      receivers: [fluentforward]
+      processors: [transform, resource, batch]
+      exporters: [otlphttp]
