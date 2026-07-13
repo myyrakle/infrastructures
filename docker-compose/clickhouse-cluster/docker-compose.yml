@@ -1,0 +1,37 @@
+services:
+  keeper:
+    image: clickhouse/clickhouse-keeper:latest
+    container_name: keeper
+    hostname: keeper
+    volumes:
+      - ./keeper/:/etc/clickhouse-keeper/
+
+  ch1:
+    image: clickhouse/clickhouse-server:latest
+    container_name: ch1
+    hostname: ch1
+    ports:
+      - "18123:8123"
+      - "19000:9000"
+    volumes:
+      - ./clickhouse/node1/:/etc/clickhouse-server/config.d
+      - ch1-data:/var/lib/clickhouse
+    depends_on:
+      - keeper
+
+  ch2:
+    image: clickhouse/clickhouse-server:latest
+    container_name: ch2
+    hostname: ch2
+    ports:
+      - "18124:8123"
+      - "19001:9000"
+    volumes:
+      - ./clickhouse/node2/:/etc/clickhouse-server/config.d
+      - ch2-data:/var/lib/clickhouse
+    depends_on:
+      - keeper
+
+volumes:
+  ch1-data:
+  ch2-data:
