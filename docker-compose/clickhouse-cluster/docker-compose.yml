@@ -5,11 +5,15 @@ services:
     hostname: keeper
     volumes:
       - ./keeper/:/etc/clickhouse-keeper/
+      - keeper-data:/var/lib/clickhouse
 
   ch1:
     image: clickhouse/clickhouse-server:latest
     container_name: ch1
     hostname: ch1
+    environment:
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: clickhouse
     ports:
       - "18123:8123"
       - "19000:9000"
@@ -23,6 +27,9 @@ services:
     image: clickhouse/clickhouse-server:latest
     container_name: ch2
     hostname: ch2
+    environment:
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: clickhouse
     ports:
       - "18124:8123"
       - "19001:9000"
@@ -33,5 +40,6 @@ services:
       - keeper
 
 volumes:
+  keeper-data:
   ch1-data:
   ch2-data:
