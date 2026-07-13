@@ -1,6 +1,9 @@
 <clickhouse>
+    <listen_host>0.0.0.0</listen_host>
+
     <remote_servers>
         <my_cluster>
+            <secret>my_cluster_secret</secret>
             <shard>
                 <replica>
                     <host>ch1</host>
