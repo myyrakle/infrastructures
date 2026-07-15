@@ -17,10 +17,10 @@ processors:
         statements:
           # FireLens enable-ecs-log-metadata 가 넣어주는 ecs_task_arn 을 Resource 로 승격
           - set(resource.attributes["aws.ecs.task.arn"], attributes["ecs_task_arn"]) where attributes["ecs_task_arn"] != nil
-          # 앱 stdout JSON 을 파싱해 필드를 attributes 로 병합 (msg/level/trace_id/span_id 등)
-          - merge_maps(attributes, ParseJSON(attributes["log"]), "upsert") where attributes["log"] != nil and IsMatch(attributes["log"], "^\\s*\\{")
-          # 앱 로그 원문은 Body 로 유지
-          - set(body, attributes["log"]) where attributes["log"] != nil
+          # 앱 stdout JSON 을 파싱해 필드를 attributes 로 병합 (msg/level/trace_id/span_id 등).
+          # fluentforward receiver 는 forward 레코드의 log 필드를 attributes["log"] 가 아니라
+          # LogRecord Body 로 매핑하므로 반드시 body 에서 파싱해야 한다.
+          - merge_maps(attributes, ParseJSON(body), "upsert") where IsString(body) and IsMatch(body, "^\\s*\\{")
           # trace 상관: 앱(observability.NewSlogHandler)이 남긴 trace_id/span_id(hex)를
           # LogRecord 의 TraceId/SpanId 로 승격 → ClickStack 로그↔트레이스 연결
           - set(trace_id.string, attributes["trace_id"]) where attributes["trace_id"] != nil
