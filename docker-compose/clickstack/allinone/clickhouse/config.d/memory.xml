@@ -1,0 +1,5 @@
+<clickhouse>
+    <!-- Hard cap for the ClickHouse server process (bytes). 8 GiB. -->
+    <max_server_memory_usage>8589934592</max_server_memory_usage>
+    <mark_cache_size>1073741824</mark_cache_size>
+</clickhouse>
