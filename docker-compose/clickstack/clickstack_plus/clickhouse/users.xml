@@ -1,0 +1,69 @@
+<?xml version="1.0"?>
+<clickhouse>
+    <profiles>
+        <default>
+            <max_memory_usage>10000000000</max_memory_usage>
+            <use_uncompressed_cache>0</use_uncompressed_cache>
+            <load_balancing>in_order</load_balancing>
+            <log_queries>1</log_queries>
+            <allow_experimental_time_series_table>1</allow_experimental_time_series_table>
+        </default>
+        <pyroscope>
+            <!-- Keep object-store DDL stable for pyroscope-plus's strict
+                 schema validator while the server itself runs ClickHouse 26. -->
+            <compatibility>25.8</compatibility>
+        </pyroscope>
+    </profiles>
+
+    <users>
+        <default>
+            <password from_env="CLICKHOUSE_DEFAULT_PASSWORD"/>
+            <profile>default</profile>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <quota>default</quota>
+            <!-- Allow SQL-driven user/role/grant management (ClickStack default;
+                 previously set via CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1). -->
+            <access_management>1</access_management>
+            <named_collection_control>1</named_collection_control>
+        </default>
+        <api>
+            <password from_env="CLICKHOUSE_API_PASSWORD"/>
+            <profile>default</profile>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <quota>default</quota>
+        </api>
+        <worker>
+            <password from_env="CLICKHOUSE_WORKER_PASSWORD"/>
+            <profile>default</profile>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <quota>default</quota>
+        </worker>
+        <pyroscope>
+            <password from_env="CLICKHOUSE_PYROSCOPE_PASSWORD"/>
+            <profile>pyroscope</profile>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <quota>default</quota>
+        </pyroscope>
+    </users>
+
+    <quotas>
+        <default>
+            <interval>
+                <duration>3600</duration>
+                <queries>0</queries>
+                <errors>0</errors>
+                <result_rows>0</result_rows>
+                <read_rows>0</read_rows>
+                <execution_time>0</execution_time>
+            </interval>
+        </default>
+    </quotas>
+</clickhouse>

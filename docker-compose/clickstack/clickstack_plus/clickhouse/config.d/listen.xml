@@ -1,0 +1,12 @@
+<clickhouse>
+    <!-- Restores the listen setting that the stock clickhouse-server image
+         ships in config.d/docker_related_config.xml. Our bind mount of
+         ./clickhouse/config.d over /etc/clickhouse-server/config.d shadows that
+         file, so without this ClickHouse listens only on localhost and other
+         containers (otel-collector, app) — and the published host ports — get
+         "connection refused" on 9000/8123.
+         listen_try=1 keeps startup from aborting if an address can't be bound
+         (e.g. IPv6 unavailable on the docker bridge). -->
+    <listen_host>0.0.0.0</listen_host>
+    <listen_try>1</listen_try>
+</clickhouse>

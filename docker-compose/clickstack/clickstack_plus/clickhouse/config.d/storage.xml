@@ -1,0 +1,10 @@
+<clickhouse>
+    <storage_configuration>
+        <disks>
+            <default>
+                <!-- Reserve headroom so writes fail cleanly before the disk is 100% full. -->
+                <keep_free_space_bytes>26843545600</keep_free_space_bytes>
+            </default>
+        </disks>
+    </storage_configuration>
+</clickhouse>

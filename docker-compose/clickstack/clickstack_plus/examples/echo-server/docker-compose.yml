@@ -1,0 +1,16 @@
+services:
+  echo-server:
+    build:
+      context: .
+    container_name: clickstack-echo-server
+    restart: unless-stopped
+    environment:
+      PORT: 8080
+      OTEL_SERVICE_NAME: clickstack-echo-server
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-https://clickhouse-otel-exporter.chainshift.co}
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      CLICKSTACK_INGESTION_API_KEY: ${CLICKSTACK_INGESTION_API_KEY:?set HyperDX Ingestion API Key in examples/echo-server/.env}
+      OTEL_EXPORTER_OTLP_HEADERS: authorization=${CLICKSTACK_INGESTION_API_KEY:?set HyperDX Ingestion API Key in examples/echo-server/.env}
+      DATABASE_URL: ${DATABASE_URL:-postgres://${USER:-postgres}@host.docker.internal:5432/postgres?sslmode=disable}
+    ports:
+      - "${ECHO_SERVER_PORT:-18081}:8080"

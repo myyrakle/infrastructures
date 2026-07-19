@@ -1,0 +1,39 @@
+# 독립 실행형 로그 콜렉터 (메인 clickstack compose와 분리 — 간섭 없음)
+#
+# 실행: crawler와 같은 호스트에서
+#   CRAWLER_LOG_PATH=$(docker inspect -f '{{.LogPath}}' <크롤러 컨테이너 이름>) \
+#   docker compose -f otel-log-collector/docker-compose.yml up -d
+#
+# 검증 완료(호스트에서 실제 동작 확인):
+#  - 콜렉터는 root(user: "0:0")로 떠야 한다 — root 소유 docker 로그 파일을 비-root로
+#    읽으면 permission denied.
+#  - /var/lib/docker/containers 전체가 아니라 크롤러 컨테이너의 로그 파일(docker
+#    inspect 의 LogPath) 하나만 /logs/crawler-json.log 로 마운트한다.
+#  - 이 경우 컨테이너 이름 메타데이터가 없어 filter 프로세서가 전체 로그를 삭제해
+#    버리므로 필요 없다(파일 자체가 크롤러 전용) — config.yaml 참고.
+#
+# 필요한 환경변수(.env 또는 셸):
+#   CRAWLER_LOG_PATH=<docker inspect -f '{{.LogPath}}' 로 얻은 크롤러 컨테이너의 로그 파일 경로>
+#   CLICKSTACK_INGESTION_API_KEY=<ClickStack 인제스트 키>
+#   OTEL_SERVICE_NAME=crawler
+#   DEPLOY_ENV=<배포 환경: dev|qa|prod>   # ClickStack 백엔드가 환경 공유이므로 로그에 환경 태그 부여용
+#
+# OTLP 엔드포인트(http://localhost:4318)는 config.yaml에 하드코딩되어 있다
+# (같은 호스트의 ClickStack OTLP — 크롤러 메트릭이 이미 같은 경로로 정상 수집됨).
+
+services:
+  otel-log-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-log-collector
+    restart: unless-stopped
+    user: "0:0"   # root 소유 docker 로그 파일을 읽기 위해 root로 실행
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment:
+      - CLICKSTACK_INGESTION_API_KEY=${CLICKSTACK_INGESTION_API_KEY}
+      - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-crawler}
+      - DEPLOY_ENV=${DEPLOY_ENV:-dev}
+    network_mode: host   # config.yaml의 localhost:4318 OTLP 엔드포인트 접근용
+    volumes:
+      - ./config.yaml:/etc/otelcol/config.yaml:ro
+      # 크롤러 컨테이너의 docker json 로그 파일 하나만 마운트 (브로드 마운트 금지)
+      - ${CRAWLER_LOG_PATH}:/logs/crawler-json.log:ro

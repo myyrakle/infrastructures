@@ -1,0 +1,7 @@
+docs/superpowers
+.superpowers
+
+# Local persisted data (bind-mount fallback), never commit
+.volumes/
+
+.env

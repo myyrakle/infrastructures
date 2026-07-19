@@ -1,0 +1,53 @@
+# OTel Collector — crawler 전용 로그 파일 tail (filelog → ClickStack OTLP)
+
+# receivers:
+#   filelog:
+#     include: [/logs/*-json.log]
+#     start_at: beginning
+#     operators:
+#       - type: container
+#         format: docker
+#         add_metadata_from_filepath: false
+#       - type: json_parser
+#         if: 'body matches "^\\s*[{]"'
+#         parse_from: body
+#         parse_to: attributes
+#       - type: severity_parser
+#         if: "attributes.level != nil"
+#         parse_from: attributes.level
+
+processors:
+  # trace 상관: 앱이 남긴 trace_id/span_id(hex)를 LogRecord의 TraceId/SpanId로 승격
+  transform:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          - set(trace_id.string, attributes["trace_id"]) where attributes["trace_id"] != nil
+          - set(span_id.string, attributes["span_id"]) where attributes["span_id"] != nil
+  # service.name 부여 (ClickStack에서 ServiceName 컬럼으로 그룹핑)
+  # deployment.environment 부여 — ClickStack 백엔드가 prod/dev/qa 공유이므로 환경 구분 태그 필수.
+  resource:
+    attributes:
+      - key: service.name
+        value: ${env:OTEL_SERVICE_NAME}
+        action: upsert
+      - key: deployment.environment
+        value: ${env:DEPLOY_ENV}
+        action: upsert
+  batch:
+    timeout: 5s
+
+exporters:
+  otlphttp:
+    logs_endpoint: http://localhost:4318/v1/logs
+    headers:
+      # ClickStack 인제스트 키 — raw 토큰(Bearer 접두어 없음)
+      authorization: ${env:CLICKSTACK_INGESTION_API_KEY}
+
+service:
+  pipelines:
+    logs:
+      receivers: [filelog]
+      processors: [transform, resource, batch]
+      exporters: [otlphttp]

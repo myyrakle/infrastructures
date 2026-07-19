@@ -1,0 +1,22 @@
+target: all
+architecture_storage: v2
+
+storage:
+  backend: clickhouse
+  clickhouse:
+    addresses: clickhouse:9000
+    database: pyroscope
+    objects_table: pyroscope_objects
+    chunks_table: pyroscope_object_chunks
+    username: pyroscope
+    password: ${CLICKHOUSE_PYROSCOPE_PASSWORD}
+    secure: false
+    auto_create_tables: ${CLICKHOUSE_AUTO_CREATE_TABLES}
+    cleanup:
+      enabled: ${CLICKHOUSE_CLEANUP_ENABLED}
+
+metastore:
+  raft:
+    dir: /data-metastore/raft
+    snapshots_dir: /data-metastore/raft
+  data_dir: /data-metastore/data

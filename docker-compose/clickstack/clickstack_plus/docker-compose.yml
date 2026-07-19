@@ -1,0 +1,196 @@
+# ClickStack split into its four component services (previously a single
+# clickhouse/clickstack-all-in-one container). The project name is pinned to
+# "clickstack" so the named volumes stay clickstack_ch_data / clickstack_ch_logs
+# / clickstack_mongo_data — identical to the all-in-one layout, so existing data
+# is preserved across the split.
+name: clickstack
+
+services:
+  clickhouse:
+    image: ${CLICKHOUSE_IMAGE}
+    container_name: clickstack-clickhouse
+    restart: unless-stopped
+    mem_limit: 9g # ClickHouse itself is capped at 8 GiB (config.d/memory.xml); ~1g headroom
+    environment:
+      # Consumed by clickhouse/users.xml via <password from_env=...>.
+      - CLICKHOUSE_DEFAULT_PASSWORD=${CLICKHOUSE_DEFAULT_PASSWORD}
+      - CLICKHOUSE_API_PASSWORD=${CLICKHOUSE_API_PASSWORD}
+      - CLICKHOUSE_WORKER_PASSWORD=${CLICKHOUSE_WORKER_PASSWORD}
+      - CLICKHOUSE_PYROSCOPE_PASSWORD=${CLICKHOUSE_PYROSCOPE_PASSWORD}
+      # Don't let the image entrypoint generate users.d/default-password.xml —
+      # it overrides our mounted users.xml and resets the default password.
+      # Our users.xml fully defines default/api/worker (with access_management).
+      - CLICKHOUSE_SKIP_USER_SETUP=1
+    volumes:
+      - ch_data:/var/lib/clickhouse
+      - ch_logs:/var/log/clickhouse-server
+      - ./clickhouse/config.d:/etc/clickhouse-server/config.d:ro
+      - ./clickhouse/users.xml:/etc/clickhouse-server/users.xml:ro
+    ports:
+      - "${CLICKHOUSE_HTTP_PORT}:8123" # ClickHouse HTTP (host access for scripts/clients; native 9000 stays internal-only)
+      - "${CLICKHOUSE_TCP_PORT}:9000" # ClickHouse TCP (native protocol)
+    networks:
+      - internal
+    healthcheck:
+      # Probe the NATIVE protocol (9000) that the collector/app connect on, not
+      # just HTTP /ping — otherwise a dependent can start while 9000 is still
+      # closed and fail with "connection refused". $$ escapes compose
+      # interpolation so the password expands inside the container.
+      test: ["CMD-SHELL", "clickhouse-client --password \"$$CLICKHOUSE_DEFAULT_PASSWORD\" --query 'SELECT 1'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  mongodb:
+    image: ${MONGO_IMAGE}
+    container_name: clickstack-mongodb
+    restart: unless-stopped
+    mem_limit: 1g
+    volumes:
+      - mongo_data:/data/db
+    # No published ports: HyperDX app metadata store is reachable only on the
+    # internal network. Exposing 27017 would make it internet-reachable on a
+    # public host.
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "mongo --quiet --eval 'db.adminCommand({ping:1}).ok' | grep -q 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  otel-collector:
+    image: ${OTEL_COLLECTOR_IMAGE}
+    container_name: clickstack-otel-collector
+    restart: unless-stopped
+    mem_limit: 1g
+    environment:
+      - CLICKHOUSE_ENDPOINT=tcp://clickhouse:9000?dial_timeout=10s
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_DEFAULT_PASSWORD}
+      - HYPERDX_OTEL_EXPORTER_CLICKHOUSE_DATABASE=default
+      - HYPERDX_LOG_LEVEL=info
+      # Pulls the ingestion API key / pipeline config from the app over OpAMP.
+      # Until a HyperDX team exists, the collector rejects telemetry (same as
+      # the all-in-one behaviour).
+      - OPAMP_SERVER_URL=http://app:4320
+    ports:
+      - "${OTLP_GRPC_PORT}:4317" # OTLP gRPC
+      - "${OTLP_HTTP_PORT}:4318" # OTLP HTTP
+    networks:
+      - internal
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      app:
+        condition: service_started
+
+  app:
+    image: ${HYPERDX_APP_IMAGE}
+    container_name: clickstack-app
+    restart: unless-stopped
+    mem_limit: 2g
+    environment:
+      # Absolute base for post-login redirects. MUST match the external origin
+      # users reach the UI on. The app + API + miner all run in this one
+      # container and are served on a single origin/port (8080) exactly like the
+      # all-in-one, so only 8080 needs to be published/proxied and the browser
+      # talks to the API on the same origin.
+      - FRONTEND_URL=${FRONTEND_URL}
+      - HYPERDX_APP_URL=${FRONTEND_URL}
+      - NEXT_PUBLIC_SERVER_URL=${FRONTEND_URL}
+      - HYPERDX_APP_PORT=8080
+      - HYPERDX_API_PORT=8000
+      - HYPERDX_LOG_LEVEL=info
+      - OPAMP_PORT=4320
+      - OTEL_SERVICE_NAME=hdx-oss-api
+      - USAGE_STATS_ENABLED=false
+      - MONGO_URI=mongodb://mongodb:27017/hyperdx
+      # Seed connection/sources on a FRESH install only (ignored once Mongo has
+      # data). Points at the ClickHouse service on the internal network.
+      - DEFAULT_CONNECTIONS=[{"name":"Local ClickHouse","host":"http://clickhouse:8123","username":"default","password":"${CLICKHOUSE_DEFAULT_PASSWORD}"}]
+      - DEFAULT_SOURCES=[{"from":{"databaseName":"default","tableName":"otel_logs"},"kind":"log","timestampValueExpression":"Timestamp","name":"Logs","displayedTimestampValueExpression":"Timestamp","implicitColumnExpression":"Body","serviceNameExpression":"ServiceName","bodyExpression":"Body","eventAttributesExpression":"LogAttributes","resourceAttributesExpression":"ResourceAttributes","defaultTableSelectExpression":"Timestamp,ServiceName,SeverityText,Body","severityTextExpression":"SeverityText","traceIdExpression":"TraceId","spanIdExpression":"SpanId","connection":"Local ClickHouse","traceSourceId":"Traces","sessionSourceId":"Sessions","metricSourceId":"Metrics"},{"from":{"databaseName":"default","tableName":"otel_traces"},"kind":"trace","timestampValueExpression":"Timestamp","name":"Traces","displayedTimestampValueExpression":"Timestamp","implicitColumnExpression":"SpanName","serviceNameExpression":"ServiceName","bodyExpression":"SpanName","eventAttributesExpression":"SpanAttributes","resourceAttributesExpression":"ResourceAttributes","defaultTableSelectExpression":"Timestamp,ServiceName,StatusCode,round(Duration/1e6),SpanName","traceIdExpression":"TraceId","spanIdExpression":"SpanId","durationExpression":"Duration","durationPrecision":9,"parentSpanIdExpression":"ParentSpanId","spanNameExpression":"SpanName","spanKindExpression":"SpanKind","statusCodeExpression":"StatusCode","statusMessageExpression":"StatusMessage","connection":"Local ClickHouse","logSourceId":"Logs","sessionSourceId":"Sessions","metricSourceId":"Metrics"},{"from":{"databaseName":"default","tableName":""},"kind":"metric","timestampValueExpression":"TimeUnix","name":"Metrics","resourceAttributesExpression":"ResourceAttributes","metricTables":{"gauge":"otel_metrics_gauge","histogram":"otel_metrics_histogram","sum":"otel_metrics_sum"},"connection":"Local ClickHouse","logSourceId":"Logs","traceSourceId":"Traces","sessionSourceId":"Sessions"},{"from":{"databaseName":"default","tableName":"hyperdx_sessions"},"kind":"session","timestampValueExpression":"TimestampTime","name":"Sessions","displayedTimestampValueExpression":"Timestamp","implicitColumnExpression":"Body","serviceNameExpression":"ServiceName","bodyExpression":"Body","eventAttributesExpression":"LogAttributes","resourceAttributesExpression":"ResourceAttributes","defaultTableSelectExpression":"Timestamp,ServiceName,SeverityText,Body","severityTextExpression":"SeverityText","traceIdExpression":"TraceId","spanIdExpression":"SpanId","connection":"Local ClickHouse","logSourceId":"Logs","traceSourceId":"Traces","metricSourceId":"Metrics"}]
+    ports:
+      - "${HYPERDX_PORT}:8080" # HyperDX UI + API (single origin)
+    networks:
+      - internal
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      # Node is guaranteed present in this image; wget/curl may not be.
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:8080',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  pyroscope:
+    image: myyrakle/pyroscope-plus:v2.2.0
+    restart: unless-stopped
+    init: true
+    command:
+      - -config.file=/etc/pyroscope/config.yaml
+      - -config.expand-env=true
+      # pyroscope-plus v2.2.0 does not propagate the YAML password field to
+      # the ClickHouse client; the explicit flag is required for auth.
+      - -storage.clickhouse.password=${CLICKHOUSE_PYROSCOPE_PASSWORD}
+    ports:
+      - "${PYROSCOPE_HTTP_PORT}:4040"
+    environment:
+      CLICKHOUSE_DATABASE: pyroscope
+      CLICKHOUSE_USER: pyroscope
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PYROSCOPE_PASSWORD}
+      CLICKHOUSE_AUTO_CREATE_TABLES: ${CLICKHOUSE_AUTO_CREATE_TABLES:-true}
+      CLICKHOUSE_CLEANUP_ENABLED: ${CLICKHOUSE_CLEANUP_ENABLED:-false}
+    volumes:
+      - ./pyroscope.yaml:/etc/pyroscope/config.yaml:ro
+      - pyroscope-metastore-data:/data-metastore
+    tmpfs:
+      - /data:uid=10001,gid=10001,mode=0750
+      - /data-compactor:uid=10001,gid=10001,mode=0750
+    networks:
+      - internal
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      pyroscope-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/usr/bin/profilecli", "ready", "--url=http://localhost:4040"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 90s
+    stop_grace_period: 2m
+
+  pyroscope-init:
+    image: ${CLICKHOUSE_IMAGE}
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        clickhouse-client --host clickhouse --user default
+        --password "$$CLICKHOUSE_DEFAULT_PASSWORD"
+        --query "CREATE DATABASE IF NOT EXISTS pyroscope"
+    environment:
+      CLICKHOUSE_DEFAULT_PASSWORD: ${CLICKHOUSE_DEFAULT_PASSWORD}
+    networks:
+      - internal
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+
+
+networks:
+  internal:
+
+volumes:
+  ch_data:
+  ch_logs:
+  mongo_data:
+  pyroscope-metastore-data:
