@@ -1,0 +1,83 @@
+<?xml version="1.0"?>
+<clickhouse>
+    <text_log>
+        <database>system</database>
+        <table>text_log</table>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+        <engine>ENGINE = MergeTree PARTITION BY (event_date) ORDER BY (event_time) TTL event_date + INTERVAL 3 DAY DELETE SETTINGS ttl_only_drop_parts=1</engine>
+    </text_log>
+    <query_log>
+        <database>system</database>
+        <table>query_log</table>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+        <engine>ENGINE = MergeTree PARTITION BY (event_date) ORDER BY (event_time) TTL event_date + INTERVAL 3 DAY DELETE SETTINGS ttl_only_drop_parts=1</engine>
+    </query_log>
+    <trace_log>
+        <database>system</database>
+        <table>trace_log</table>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+        <engine>ENGINE = MergeTree PARTITION BY (event_date) ORDER BY (event_time) TTL event_date + INTERVAL 3 DAY DELETE SETTINGS ttl_only_drop_parts=1</engine>
+    </trace_log>
+    <part_log>
+        <database>system</database>
+        <table>part_log</table>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+        <engine>ENGINE = MergeTree PARTITION BY (event_date) ORDER BY (event_time) TTL event_date + INTERVAL 3 DAY DELETE SETTINGS ttl_only_drop_parts=1</engine>
+    </part_log>
+    <!-- 초당 1행씩 수백 컬럼을 쌓는 최대 용량 주범 -->
+    <metric_log>
+        <database>system</database>
+        <table>metric_log</table>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+        <engine>ENGINE = MergeTree PARTITION BY (event_date) ORDER BY (event_time) TTL event_date + INTERVAL 3 DAY DELETE SETTINGS ttl_only_drop_parts=1</engine>
+    </metric_log>
+    <asynchronous_metric_log>
+        <database>system</database>
+        <table>asynchronous_metric_log</table>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+        <engine>ENGINE = MergeTree PARTITION BY (event_date) ORDER BY (event_time) TTL event_date + INTERVAL 3 DAY DELETE SETTINGS ttl_only_drop_parts=1</engine>
+    </asynchronous_metric_log>
+    <!-- 쿼리당 초 단위 메트릭 — 콜렉터가 상시 insert하는 환경에서 빠르게 증가 -->
+    <query_metric_log>
+        <database>system</database>
+        <table>query_metric_log</table>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+        <engine>ENGINE = MergeTree PARTITION BY (event_date) ORDER BY (event_time) TTL event_date + INTERVAL 3 DAY DELETE SETTINGS ttl_only_drop_parts=1</engine>
+    </query_metric_log>
+    <latency_log>
+        <database>system</database>
+        <table>latency_log</table>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+        <engine>ENGINE = MergeTree PARTITION BY (event_date) ORDER BY (event_time) TTL event_date + INTERVAL 3 DAY DELETE SETTINGS ttl_only_drop_parts=1</engine>
+    </latency_log>
+    <error_log>
+        <database>system</database>
+        <table>error_log</table>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+        <engine>ENGINE = MergeTree PARTITION BY (event_date) ORDER BY (event_time) TTL event_date + INTERVAL 3 DAY DELETE SETTINGS ttl_only_drop_parts=1</engine>
+    </error_log>
+    <processors_profile_log>
+        <database>system</database>
+        <table>processors_profile_log</table>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+        <engine>ENGINE = MergeTree PARTITION BY (event_date) ORDER BY (event_time) TTL event_date + INTERVAL 3 DAY DELETE SETTINGS ttl_only_drop_parts=1</engine>
+    </processors_profile_log>
+    <query_views_log>
+        <database>system</database>
+        <table>query_views_log</table>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+        <engine>ENGINE = MergeTree PARTITION BY (event_date) ORDER BY (event_time) TTL event_date + INTERVAL 3 DAY DELETE SETTINGS ttl_only_drop_parts=1</engine>
+    </query_views_log>
+    <query_thread_log>
+        <database>system</database>
+        <table>query_thread_log</table>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+        <engine>ENGINE = MergeTree PARTITION BY (event_date) ORDER BY (event_time) TTL event_date + INTERVAL 3 DAY DELETE SETTINGS ttl_only_drop_parts=1</engine>
+    </query_thread_log>
+    <asynchronous_insert_log>
+        <database>system</database>
+        <table>asynchronous_insert_log</table>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+        <engine>ENGINE = MergeTree PARTITION BY (event_date) ORDER BY (event_time) TTL event_date + INTERVAL 3 DAY DELETE SETTINGS ttl_only_drop_parts=1</engine>
+    </asynchronous_insert_log>
+</clickhouse>
