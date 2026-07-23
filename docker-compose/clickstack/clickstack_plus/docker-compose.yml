@@ -130,7 +130,7 @@ services:
       start_period: 60s
 
   pyroscope:
-    image: myyrakle/pyroscope-plus:v2.2.0
+    image: myyrakle/pyroscope-plus:v2.2.2
     restart: unless-stopped
     init: true
     command:
