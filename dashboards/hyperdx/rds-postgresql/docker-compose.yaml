@@ -1,0 +1,69 @@
+services:
+  otel-rds-collector:
+    image: ${OTEL_CONTRIB_IMAGE}
+    container_name: clickstack-otel-rds-collector
+    restart: unless-stopped
+    mem_limit: 512m
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment:
+      - POSTGRES_DEV_HOST=${POSTGRES_DEV_HOST}
+      - POSTGRES_DEV_PORT=${POSTGRES_DEV_PORT:-5432}
+      - POSTGRES_DEV_DATABASE=${POSTGRES_DEV_DATABASE}
+      - POSTGRES_DEV_MONITOR_USER=${POSTGRES_DEV_MONITOR_USER:-otel_monitor}
+      - POSTGRES_DEV_MONITOR_PASSWORD=${POSTGRES_DEV_MONITOR_PASSWORD}
+      - POSTGRES_PROD_HOST=${POSTGRES_PROD_HOST}
+      - POSTGRES_PROD_PORT=${POSTGRES_PROD_PORT:-5432}
+      - POSTGRES_PROD_DATABASE=${POSTGRES_PROD_DATABASE}
+      - POSTGRES_PROD_MONITOR_USER=${POSTGRES_PROD_MONITOR_USER:-otel_monitor}
+      - POSTGRES_PROD_MONITOR_PASSWORD=${POSTGRES_PROD_MONITOR_PASSWORD}
+      # CloudWatch(AWS/RDS) 인스턴스 지표 수집용. dev/prod 는 AWS 계정이 달라
+      # 키가 2세트인데 receiver 는 프로필 방식만 지원 — .env 의 키 4개로
+      # otel-rds-collector-init 이 credentials 파일을 만들어 볼륨으로 공유한다.
+      - AWS_SHARED_CREDENTIALS_FILE=/etc/otelcol-creds/aws-credentials
+      - RDS_DEV_INSTANCE_ID=${RDS_DEV_INSTANCE_ID}
+      - RDS_PROD_INSTANCE_ID=${RDS_PROD_INSTANCE_ID}
+      - CLICKSTACK_INGESTION_API_KEY=${CLICKSTACK_INGESTION_API_KEY}
+      # 메트릭을 보낼 수신 콜렉터의 OTLP HTTP 주소 (스킴 포함 URL).
+      # 기본: 같은 네트워크의 clickstack-otel-collector. https:// 외부 주소도 가능.
+      - OTEL_COLLECTOR_ENDPOINT=${OTEL_COLLECTOR_ENDPOINT:-http://clickstack-otel-collector:4318}
+    volumes:
+      - ./config.yaml:/etc/otelcol/config.yaml:ro
+      # RDS CA 번들 — 파일이 없으면 docker 가 디렉토리를 만들어 기동이 깨지므로
+      # 먼저 다운로드해 둘 것 (otel-rds-collector/README.md):
+      #   curl -fsSL -o otel-rds-collector/rds-global-bundle.pem \
+      #     https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+      - ./rds-global-bundle.pem:/etc/otelcol/rds-global-bundle.pem:ro
+      # otel-rds-collector-init 이 .env 의 AWS 키로 생성한 credentials 파일
+      - rds_aws_creds:/etc/otelcol-creds:ro
+    networks:
+      - internal
+    depends_on:
+      otel-rds-collector-init:
+        condition: service_completed_successfully
+
+  # .env 의 계정별 AWS 키를 SDK credentials 파일([dev]/[prod] 프로필)로 변환해
+  # 볼륨에 써 준다. otel contrib 이미지는 쉘이 없어 직접 생성할 수 없다
+  otel-rds-collector-init:
+    image: ${BUSYBOX_IMAGE}
+    restart: "no"
+    command:
+      - /bin/sh
+      - -c
+      - >-
+        printf '[dev]\naws_access_key_id = %s\naws_secret_access_key = %s\n[prod]\naws_access_key_id = %s\naws_secret_access_key = %s\n'
+        "$$AWS_DEV_ACCESS_KEY_ID" "$$AWS_DEV_SECRET_ACCESS_KEY"
+        "$$AWS_PROD_ACCESS_KEY_ID" "$$AWS_PROD_SECRET_ACCESS_KEY"
+        > /creds/aws-credentials
+    environment:
+      AWS_DEV_ACCESS_KEY_ID: ${AWS_DEV_ACCESS_KEY_ID}
+      AWS_DEV_SECRET_ACCESS_KEY: ${AWS_DEV_SECRET_ACCESS_KEY}
+      AWS_PROD_ACCESS_KEY_ID: ${AWS_PROD_ACCESS_KEY_ID}
+      AWS_PROD_SECRET_ACCESS_KEY: ${AWS_PROD_SECRET_ACCESS_KEY}
+    volumes:
+      - rds_aws_creds:/creds
+
+networks:
+  internal:
+
+volumes:
+  rds_aws_creds:
