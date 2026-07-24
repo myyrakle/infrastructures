@@ -1,0 +1,381 @@
+receivers:
+  postgresql/dev:
+    endpoint: ${env:POSTGRES_DEV_HOST}:${env:POSTGRES_DEV_PORT}
+    transport: tcp
+    username: ${env:POSTGRES_DEV_MONITOR_USER}
+    password: ${env:POSTGRES_DEV_MONITOR_PASSWORD}
+    # databases 를 비우면 rdsadmin(RDS 내부 DB)까지 수집을 시도해서 매 주기
+    # 접속 거부 에러가 나므로, RDS에서는 반드시 대상 DB를 명시한다.
+    databases:
+      - ${env:POSTGRES_DEV_DATABASE}
+    collection_interval: 30s
+    tls:
+      insecure: false
+      insecure_skip_verify: false
+      ca_file: /etc/otelcol/rds-global-bundle.pem
+    # 기본 비활성(optional) 메트릭 중 대시보드에 쓰는 것들을 켠다
+    metrics: &pg_optional_metrics
+      postgresql.blks_hit: # 버퍼 캐시 히트 (blks_read 와 함께 캐시 히트율 계산)
+        enabled: true
+      postgresql.blks_read:
+        enabled: true
+      postgresql.database.locks: # pg_locks 스냅샷 (mode/lock_type 별)
+        enabled: true
+      postgresql.deadlocks:
+        enabled: true
+      postgresql.temp_files: # work_mem 부족 신호
+        enabled: true
+      postgresql.temp.io:
+        enabled: true
+      postgresql.sequential_scans: # 풀스캔 많은 테이블 탐지
+        enabled: true
+
+  postgresql/prod:
+    endpoint: ${env:POSTGRES_PROD_HOST}:${env:POSTGRES_PROD_PORT}
+    transport: tcp
+    username: ${env:POSTGRES_PROD_MONITOR_USER}
+    password: ${env:POSTGRES_PROD_MONITOR_PASSWORD}
+    databases:
+      - ${env:POSTGRES_PROD_DATABASE}
+    collection_interval: 30s
+    tls:
+      insecure: false
+      insecure_skip_verify: false
+      ca_file: /etc/otelcol/rds-global-bundle.pem
+    metrics: *pg_optional_metrics
+
+  # 쿼리 레벨 모니터링 (Datadog DBM 의 Load by Wait Event / Top Queries 에 해당).
+  # 비밀번호에 작은따옴표(')가 들어가면 DSN 이 깨진다 — 그런 비밀번호는 피할 것.
+  sqlquery/dev:
+    driver: postgres
+    datasource: "host=${env:POSTGRES_DEV_HOST} port=${env:POSTGRES_DEV_PORT} user=${env:POSTGRES_DEV_MONITOR_USER} password='${env:POSTGRES_DEV_MONITOR_PASSWORD}' dbname=${env:POSTGRES_DEV_DATABASE} sslmode=verify-full sslrootcert=/etc/otelcol/rds-global-bundle.pem"
+    collection_interval: 15s
+    queries: &pg_dbm_queries
+      # [1] 활성 세션을 wait event 별로 샘플링 — "Average Load by Wait Event" 차트용.
+      # wait_event 가 NULL 이면 실제로 CPU 에서 실행 중인 세션이다.
+      # 활성 세션이 없을 때 0행이 되면 receiver 가 매 주기 에러를 찍으므로
+      # UNION ALL 로 최소 1행('None', 0)을 보장한다.
+      - sql: >
+          SELECT coalesce(wait_event_type, 'CPU') AS wait_event_type,
+                 coalesce(wait_event, 'CPU') AS wait_event,
+                 count(*)::int AS sessions
+          FROM pg_stat_activity
+          WHERE state = 'active' AND backend_type = 'client backend'
+            AND pid <> pg_backend_pid()
+          GROUP BY 1, 2
+          UNION ALL
+          SELECT 'None', 'None', 0
+          WHERE NOT EXISTS (
+            SELECT 1 FROM pg_stat_activity
+            WHERE state = 'active' AND backend_type = 'client backend'
+              AND pid <> pg_backend_pid()
+          )
+        metrics:
+          - metric_name: postgresql.active_sessions
+            value_column: sessions
+            attribute_columns: [wait_event_type, wait_event]
+            data_type: gauge
+            value_type: int
+            description: Active sessions sampled from pg_stat_activity, by wait event
+            unit: "{sessions}"
+      # [2] pg_stat_statements 상위 50개 쿼리 (누적 통계, 총 수행 시간 기준) — Top Queries /
+      # Query Throughput / Avg Duration 차트용. 쿼리 텍스트는 정규화된 형태($1 등)를
+      # 공백 정리 후 1000자로 자른다. 다른 DB(rdsadmin 등)의 문장은 제외.
+      # 주의: 절단 길이를 바꾸면 200자 넘던 쿼리의 시리즈 식별자(query_text)가 바뀐다.
+      - sql: >
+          SELECT s.queryid::text AS query_id,
+                 left(regexp_replace(s.query, E'\\s+', ' ', 'g'), 1000) AS query_text,
+                 s.calls::bigint AS calls,
+                 s.total_exec_time AS total_time_ms,
+                 s.mean_exec_time AS mean_time_ms,
+                 s.max_exec_time AS max_time_ms,
+                 s.rows::bigint AS rows_affected
+          FROM pg_stat_statements s
+          JOIN pg_database d ON d.oid = s.dbid
+          WHERE d.datname = current_database()
+          ORDER BY s.total_exec_time DESC
+          LIMIT 50
+        metrics:
+          - metric_name: postgresql.query.calls
+            value_column: calls
+            attribute_columns: [query_id, query_text]
+            data_type: sum
+            value_type: int
+            monotonic: true
+            aggregation: cumulative
+            description: Cumulative calls per statement (pg_stat_statements)
+            unit: "{calls}"
+          - metric_name: postgresql.query.total_time
+            value_column: total_time_ms
+            attribute_columns: [query_id, query_text]
+            data_type: sum
+            value_type: double
+            monotonic: true
+            aggregation: cumulative
+            description: Cumulative execution time per statement
+            unit: ms
+          - metric_name: postgresql.query.mean_time
+            value_column: mean_time_ms
+            attribute_columns: [query_id, query_text]
+            data_type: gauge
+            value_type: double
+            description: Mean execution time per statement
+            unit: ms
+          - metric_name: postgresql.query.max_time
+            value_column: max_time_ms
+            attribute_columns: [query_id, query_text]
+            data_type: gauge
+            value_type: double
+            description: Max execution time per statement (cumulative since stats reset)
+            unit: ms
+          - metric_name: postgresql.query.rows
+            value_column: rows_affected
+            attribute_columns: [query_id, query_text]
+            data_type: sum
+            value_type: int
+            monotonic: true
+            aggregation: cumulative
+            description: Cumulative rows returned/affected per statement
+            unit: "{rows}"
+
+  sqlquery/prod:
+    driver: postgres
+    datasource: "host=${env:POSTGRES_PROD_HOST} port=${env:POSTGRES_PROD_PORT} user=${env:POSTGRES_PROD_MONITOR_USER} password='${env:POSTGRES_PROD_MONITOR_PASSWORD}' dbname=${env:POSTGRES_PROD_DATABASE} sslmode=verify-full sslrootcert=/etc/otelcol/rds-global-bundle.pem"
+    collection_interval: 15s
+    queries: *pg_dbm_queries
+
+  # RDS 인스턴스 리소스 지표 (CloudWatch AWS/RDS). GetMetricData 는 유료 API 라
+  # ($0.01/1000 metrics) collection_interval 은 5분으로 두고 period 60s 로
+  # 1분 해상도 데이터를 묶어 가져온다. RDS 지표는 1~2분 늦게 게시되므로 delay 필수.
+  #
+  # dev/prod 는 AWS 계정이 달라 키를 돌려쓸 수 없고, 이 receiver 는 access key
+  # 직접 지정을 지원하지 않는다(config 필드가 region/profile 뿐). 그래서 .env 의
+  # AWS_DEV_*/AWS_PROD_* 키 4개를 otel-rds-collector-init 이 credentials 파일
+  # ([dev]/[prod] 프로필)로 만들어 주고, 여기서는 profile 로 골라 쓴다.
+  aws_cloudwatch/dev:
+    region: ap-northeast-2
+    profile: dev
+    metrics:
+      collection_interval: 300s
+      period: 60s
+      delay: 120s
+      queries:
+        - namespace: AWS/RDS
+          metric_name: CPUUtilization
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_DEV_INSTANCE_ID}
+          stats: [Average]
+        - namespace: AWS/RDS
+          metric_name: DatabaseConnections
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_DEV_INSTANCE_ID}
+          stats: [Average]
+        - namespace: AWS/RDS
+          metric_name: FreeableMemory
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_DEV_INSTANCE_ID}
+          stats: [Average]
+        - namespace: AWS/RDS
+          metric_name: FreeStorageSpace
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_DEV_INSTANCE_ID}
+          stats: [Average]
+        - namespace: AWS/RDS
+          metric_name: ReadIOPS
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_DEV_INSTANCE_ID}
+          stats: [Average]
+        - namespace: AWS/RDS
+          metric_name: WriteIOPS
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_DEV_INSTANCE_ID}
+          stats: [Average]
+        - namespace: AWS/RDS
+          metric_name: ReadLatency
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_DEV_INSTANCE_ID}
+          stats: [Average]
+        - namespace: AWS/RDS
+          metric_name: WriteLatency
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_DEV_INSTANCE_ID}
+          stats: [Average]
+        - namespace: AWS/RDS
+          metric_name: ReadThroughput
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_DEV_INSTANCE_ID}
+          stats: [Average]
+        - namespace: AWS/RDS
+          metric_name: WriteThroughput
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_DEV_INSTANCE_ID}
+          stats: [Average]
+        - namespace: AWS/RDS
+          metric_name: NetworkReceiveThroughput
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_DEV_INSTANCE_ID}
+          stats: [Average]
+        - namespace: AWS/RDS
+          metric_name: NetworkTransmitThroughput
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_DEV_INSTANCE_ID}
+          stats: [Average]
+        - namespace: AWS/RDS
+          metric_name: DiskQueueDepth
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_DEV_INSTANCE_ID}
+          stats: [Average]
+        - namespace: AWS/RDS
+          metric_name: BurstBalance
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_DEV_INSTANCE_ID}
+          stats: [Average]
+
+  aws_cloudwatch/prod:
+    region: ap-northeast-2
+    profile: prod
+    metrics:
+      collection_interval: 300s
+      period: 60s
+      delay: 120s
+      queries:
+        - namespace: AWS/RDS
+          metric_name: CPUUtilization
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_PROD_INSTANCE_ID}
+          stats: [Average]
+        - namespace: AWS/RDS
+          metric_name: DatabaseConnections
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_PROD_INSTANCE_ID}
+          stats: [Average]
+        - namespace: AWS/RDS
+          metric_name: FreeableMemory
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_PROD_INSTANCE_ID}
+          stats: [Average]
+        - namespace: AWS/RDS
+          metric_name: FreeStorageSpace
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_PROD_INSTANCE_ID}
+          stats: [Average]
+        - namespace: AWS/RDS
+          metric_name: ReadIOPS
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_PROD_INSTANCE_ID}
+          stats: [Average]
+        - namespace: AWS/RDS
+          metric_name: WriteIOPS
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_PROD_INSTANCE_ID}
+          stats: [Average]
+        - namespace: AWS/RDS
+          metric_name: ReadLatency
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_PROD_INSTANCE_ID}
+          stats: [Average]
+        - namespace: AWS/RDS
+          metric_name: WriteLatency
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_PROD_INSTANCE_ID}
+          stats: [Average]
+        - namespace: AWS/RDS
+          metric_name: ReadThroughput
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_PROD_INSTANCE_ID}
+          stats: [Average]
+        - namespace: AWS/RDS
+          metric_name: WriteThroughput
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_PROD_INSTANCE_ID}
+          stats: [Average]
+        - namespace: AWS/RDS
+          metric_name: NetworkReceiveThroughput
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_PROD_INSTANCE_ID}
+          stats: [Average]
+        - namespace: AWS/RDS
+          metric_name: NetworkTransmitThroughput
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_PROD_INSTANCE_ID}
+          stats: [Average]
+        - namespace: AWS/RDS
+          metric_name: DiskQueueDepth
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_PROD_INSTANCE_ID}
+          stats: [Average]
+        - namespace: AWS/RDS
+          metric_name: BurstBalance
+          dimensions:
+            DBInstanceIdentifier: ${env:RDS_PROD_INSTANCE_ID}
+          stats: [Average]
+
+processors:
+  memory_limiter:
+    check_interval: 5s
+    limit_mib: 384
+    spike_limit_mib: 96
+
+  # HyperDX 에서 ServiceName=postgresql-rds 로 묶고
+  # ResourceAttributes['deployment.environment'] 로 dev/prod 를 구분한다.
+  resource/dev:
+    attributes:
+      - key: service.name
+        value: postgresql-rds
+        action: upsert
+      - key: deployment.environment
+        value: dev
+        action: upsert
+      - key: cloud.provider
+        value: aws
+        action: upsert
+      - key: cloud.region
+        value: ap-northeast-2
+        action: upsert
+      - key: db.system
+        value: postgresql
+        action: upsert
+
+  resource/prod:
+    attributes:
+      - key: service.name
+        value: postgresql-rds
+        action: upsert
+      - key: deployment.environment
+        value: prod
+        action: upsert
+      - key: cloud.provider
+        value: aws
+        action: upsert
+      - key: cloud.region
+        value: ap-northeast-2
+        action: upsert
+      - key: db.system
+        value: postgresql
+        action: upsert
+
+  batch:
+    timeout: 5s
+
+exporters:
+  # OTLP/HTTP — https 프록시 경유(외부 엔드포인트)와 내부 직송 모두 지원.
+  # gRPC(otlp)는 trailers 를 못 넘기는 프록시 뒤에서 "server closed the stream
+  # without sending trailers" 로 실패하므로 쓰지 않는다.
+  otlphttp:
+    # 스킴 포함 URL. http:// 는 평문, https:// 는 TLS(시스템 CA 검증).
+    # 기본값은 같은 compose 네트워크의 수신 콜렉터 OTLP HTTP(4318).
+    endpoint: ${env:OTEL_COLLECTOR_ENDPOINT:-http://clickstack-otel-collector:4318}
+    headers:
+      # ClickStack 인제스트 키 — raw 토큰(Bearer 접두어 없음)
+      authorization: ${env:CLICKSTACK_INGESTION_API_KEY}
+
+service:
+  pipelines:
+    metrics/dev:
+      receivers: [postgresql/dev, sqlquery/dev, aws_cloudwatch/dev]
+      processors: [memory_limiter, resource/dev, batch]
+      exporters: [otlphttp]
+    metrics/prod:
+      receivers: [postgresql/prod, sqlquery/prod, aws_cloudwatch/prod]
+      processors: [memory_limiter, resource/prod, batch]
+      exporters: [otlphttp]
