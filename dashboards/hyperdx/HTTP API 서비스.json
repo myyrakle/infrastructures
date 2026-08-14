@@ -1,0 +1,868 @@
+{
+  "version": "0.1.0",
+  "name": "HTTP API 서비스",
+  "tags": ["Application"],
+  "tiles": [
+    {
+      "id": "6a7d6bf9ac0b876d07d03f19",
+      "x": 0,
+      "y": 0,
+      "w": 4,
+      "h": 3,
+      "config": {
+        "name": "총 요청 수",
+        "source": "Traces",
+        "displayType": "number",
+        "numberFormat": {
+          "output": "number",
+          "mantissa": 0,
+          "thousandSeparated": true
+        },
+        "compareToPreviousPeriod": false,
+        "fillNulls": 0,
+        "alignDateRangeToGranularity": true,
+        "fitYAxisToData": false,
+        "color": "chart-blue",
+        "backgroundChart": { "type": "area" },
+        "groupByColumnsOnLeft": false,
+        "select": [
+          {
+            "aggFn": "count",
+            "aggCondition": "SpanKind = 'Server'",
+            "aggConditionLanguage": "sql",
+            "valueExpression": "",
+            "isDelta": false,
+            "alias": "요청 수"
+          }
+        ],
+        "where": "",
+        "seriesLimit": null
+      },
+      "containerId": "ov",
+      "tabId": "ov-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f1a",
+      "x": 4,
+      "y": 0,
+      "w": 4,
+      "h": 3,
+      "config": {
+        "displayType": "number",
+        "numberFormat": {
+          "output": "number",
+          "mantissa": 1,
+          "thousandSeparated": true,
+          "unit": " req/min"
+        },
+        "color": "chart-cyan",
+        "configType": "sql",
+        "sqlTemplate": "SELECT\n    count() / greatest(1.0, ({endDateMilliseconds:Int64} - {startDateMilliseconds:Int64}) / 60000.0) AS rpm\nFROM $__sourceTable\nWHERE Timestamp >= fromUnixTimestamp64Milli({startDateMilliseconds:Int64})\n    AND Timestamp <= fromUnixTimestamp64Milli({endDateMilliseconds:Int64})\n    AND SpanKind = 'Server'\n    AND $__filters",
+        "connection": "Local ClickHouse",
+        "source": "Traces",
+        "name": "분당 요청 수"
+      },
+      "containerId": "ov",
+      "tabId": "ov-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f1b",
+      "x": 8,
+      "y": 0,
+      "w": 4,
+      "h": 3,
+      "config": {
+        "displayType": "number",
+        "numberFormat": { "output": "percent", "mantissa": 2 },
+        "color": "chart-error",
+        "configType": "sql",
+        "sqlTemplate": "SELECT\n    countIf(toUInt16OrZero(SpanAttributes['http.response.status_code']) >= 500) / greatest(count(), 1) AS error_rate\nFROM $__sourceTable\nWHERE Timestamp >= fromUnixTimestamp64Milli({startDateMilliseconds:Int64})\n    AND Timestamp <= fromUnixTimestamp64Milli({endDateMilliseconds:Int64})\n    AND SpanKind = 'Server'\n    AND $__filters",
+        "connection": "Local ClickHouse",
+        "source": "Traces",
+        "name": "5xx 오류율"
+      },
+      "containerId": "ov",
+      "tabId": "ov-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f1c",
+      "x": 12,
+      "y": 0,
+      "w": 4,
+      "h": 3,
+      "config": {
+        "displayType": "number",
+        "numberFormat": { "output": "percent", "mantissa": 2 },
+        "color": "chart-warning",
+        "configType": "sql",
+        "sqlTemplate": "SELECT\n    countIf(toUInt16OrZero(SpanAttributes['http.response.status_code']) BETWEEN 400 AND 499) / greatest(count(), 1) AS client_error_rate\nFROM $__sourceTable\nWHERE Timestamp >= fromUnixTimestamp64Milli({startDateMilliseconds:Int64})\n    AND Timestamp <= fromUnixTimestamp64Milli({endDateMilliseconds:Int64})\n    AND SpanKind = 'Server'\n    AND $__filters",
+        "connection": "Local ClickHouse",
+        "source": "Traces",
+        "name": "4xx 비율"
+      },
+      "containerId": "ov",
+      "tabId": "ov-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f1d",
+      "x": 16,
+      "y": 0,
+      "w": 4,
+      "h": 3,
+      "config": {
+        "name": "P95 응답 시간",
+        "source": "Traces",
+        "displayType": "number",
+        "numberFormat": { "output": "duration", "factor": 1e-9 },
+        "color": "chart-orange",
+        "backgroundChart": { "type": "line" },
+        "select": [
+          {
+            "aggFn": "quantile",
+            "level": 0.95,
+            "aggCondition": "SpanKind = 'Server'",
+            "aggConditionLanguage": "sql",
+            "valueExpression": "Duration",
+            "isDelta": false,
+            "alias": "P95"
+          }
+        ],
+        "where": ""
+      },
+      "containerId": "ov",
+      "tabId": "ov-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f1e",
+      "x": 20,
+      "y": 0,
+      "w": 4,
+      "h": 3,
+      "config": {
+        "name": "P99 응답 시간",
+        "source": "Traces",
+        "displayType": "number",
+        "numberFormat": { "output": "duration", "factor": 1e-9 },
+        "color": "chart-red",
+        "backgroundChart": { "type": "line" },
+        "select": [
+          {
+            "aggFn": "quantile",
+            "level": 0.99,
+            "aggCondition": "SpanKind = 'Server'",
+            "aggConditionLanguage": "sql",
+            "valueExpression": "Duration",
+            "isDelta": false,
+            "alias": "P99"
+          }
+        ],
+        "where": ""
+      },
+      "containerId": "ov",
+      "tabId": "ov-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f1f",
+      "x": 0,
+      "y": 3,
+      "w": 12,
+      "h": 6,
+      "config": {
+        "displayType": "line",
+        "numberFormat": {
+          "output": "number",
+          "mantissa": 1,
+          "thousandSeparated": true
+        },
+        "configType": "sql",
+        "sqlTemplate": "SELECT\n    toStartOfInterval(Timestamp, INTERVAL {intervalSeconds:Int64} second) AS ts,\n    count() / ({intervalSeconds:Int64} / 60.0) AS `요청/분`\nFROM $__sourceTable\nWHERE Timestamp >= fromUnixTimestamp64Milli({startDateMilliseconds:Int64})\n    AND Timestamp <= fromUnixTimestamp64Milli({endDateMilliseconds:Int64})\n    AND SpanKind = 'Server'\n    AND $__filters\nGROUP BY ts\nORDER BY ts\nLIMIT 2000",
+        "connection": "Local ClickHouse",
+        "source": "Traces",
+        "name": "요청 처리량 (분당)"
+      },
+      "containerId": "ov",
+      "tabId": "ov-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f20",
+      "x": 12,
+      "y": 3,
+      "w": 12,
+      "h": 6,
+      "config": {
+        "displayType": "line",
+        "numberFormat": { "output": "percent", "mantissa": 2 },
+        "configType": "sql",
+        "sqlTemplate": "SELECT ts, kind, rate\nFROM (\n    SELECT\n        toStartOfInterval(Timestamp, INTERVAL {intervalSeconds:Int64} second) AS ts,\n        countIf(toUInt16OrZero(SpanAttributes['http.response.status_code']) >= 500) / greatest(count(), 1) AS r5,\n        countIf(toUInt16OrZero(SpanAttributes['http.response.status_code']) BETWEEN 400 AND 499) / greatest(count(), 1) AS r4\n    FROM $__sourceTable\n    WHERE Timestamp >= fromUnixTimestamp64Milli({startDateMilliseconds:Int64})\n        AND Timestamp <= fromUnixTimestamp64Milli({endDateMilliseconds:Int64})\n        AND SpanKind = 'Server'\n        AND $__filters\n    GROUP BY ts\n)\nARRAY JOIN ['5xx 오류율', '4xx 비율'] AS kind, [r5, r4] AS rate\nORDER BY ts\nLIMIT 4000",
+        "connection": "Local ClickHouse",
+        "source": "Traces",
+        "name": "오류율 추이 (4xx / 5xx)"
+      },
+      "containerId": "ov",
+      "tabId": "ov-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f21",
+      "x": 0,
+      "y": 9,
+      "w": 12,
+      "h": 6,
+      "config": {
+        "name": "응답 시간 추이",
+        "source": "Traces",
+        "displayType": "line",
+        "numberFormat": { "output": "duration", "factor": 1e-9 },
+        "select": [
+          {
+            "aggFn": "avg",
+            "aggCondition": "SpanKind = 'Server'",
+            "aggConditionLanguage": "sql",
+            "valueExpression": "Duration",
+            "isDelta": false,
+            "alias": "평균"
+          },
+          {
+            "aggFn": "quantile",
+            "level": 0.5,
+            "aggCondition": "SpanKind = 'Server'",
+            "aggConditionLanguage": "sql",
+            "valueExpression": "Duration",
+            "isDelta": false,
+            "alias": "P50"
+          },
+          {
+            "aggFn": "quantile",
+            "level": 0.95,
+            "aggCondition": "SpanKind = 'Server'",
+            "aggConditionLanguage": "sql",
+            "valueExpression": "Duration",
+            "isDelta": false,
+            "alias": "P95"
+          },
+          {
+            "aggFn": "quantile",
+            "level": 0.99,
+            "aggCondition": "SpanKind = 'Server'",
+            "aggConditionLanguage": "sql",
+            "valueExpression": "Duration",
+            "isDelta": false,
+            "alias": "P99"
+          }
+        ],
+        "where": ""
+      },
+      "containerId": "ov",
+      "tabId": "ov-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f22",
+      "x": 12,
+      "y": 9,
+      "w": 12,
+      "h": 6,
+      "config": {
+        "name": "응답 시간 분포 (히트맵)",
+        "source": "Traces",
+        "displayType": "heatmap",
+        "numberFormat": { "output": "duration", "factor": 1e-9 },
+        "select": [
+          {
+            "aggFn": "count",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "Duration",
+            "heatmapScaleType": "log"
+          }
+        ],
+        "where": "SpanKind = 'Server'",
+        "whereLanguage": "sql"
+      },
+      "containerId": "ov",
+      "tabId": "ov-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f23",
+      "x": 0,
+      "y": 15,
+      "w": 12,
+      "h": 6,
+      "config": {
+        "displayType": "stacked_bar",
+        "numberFormat": {
+          "output": "number",
+          "mantissa": 0,
+          "thousandSeparated": true
+        },
+        "configType": "sql",
+        "sqlTemplate": "SELECT\n    toStartOfInterval(Timestamp, INTERVAL {intervalSeconds:Int64} second) AS ts,\n    concat(substring(SpanAttributes['http.response.status_code'], 1, 1), 'xx') AS `상태`,\n    count() AS `요청수`\nFROM $__sourceTable\nWHERE Timestamp >= fromUnixTimestamp64Milli({startDateMilliseconds:Int64})\n    AND Timestamp <= fromUnixTimestamp64Milli({endDateMilliseconds:Int64})\n    AND SpanKind = 'Server'\n    AND $__filters\nGROUP BY ts, `상태`\nORDER BY ts\nLIMIT 5000",
+        "connection": "Local ClickHouse",
+        "source": "Traces",
+        "name": "상태 코드 클래스별 요청 추이"
+      },
+      "containerId": "ov",
+      "tabId": "ov-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f24",
+      "x": 12,
+      "y": 15,
+      "w": 6,
+      "h": 6,
+      "config": {
+        "name": "HTTP 메서드 분포",
+        "source": "Traces",
+        "displayType": "pie",
+        "numberFormat": {
+          "output": "number",
+          "mantissa": 0,
+          "thousandSeparated": true
+        },
+        "select": [
+          {
+            "aggFn": "count",
+            "aggCondition": "SpanKind = 'Server'",
+            "aggConditionLanguage": "sql",
+            "valueExpression": "",
+            "isDelta": false,
+            "alias": "요청수"
+          }
+        ],
+        "where": "",
+        "groupBy": "SpanAttributes['http.request.method']",
+        "seriesLimit": 10
+      },
+      "containerId": "ov",
+      "tabId": "ov-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f25",
+      "x": 18,
+      "y": 15,
+      "w": 6,
+      "h": 6,
+      "config": {
+        "name": "상태 코드 분포",
+        "source": "Traces",
+        "displayType": "pie",
+        "numberFormat": {
+          "output": "number",
+          "mantissa": 0,
+          "thousandSeparated": true
+        },
+        "select": [
+          {
+            "aggFn": "count",
+            "aggCondition": "SpanKind = 'Server'",
+            "aggConditionLanguage": "sql",
+            "valueExpression": "",
+            "isDelta": false,
+            "alias": "요청수"
+          }
+        ],
+        "where": "",
+        "groupBy": "SpanAttributes['http.response.status_code']",
+        "seriesLimit": 12
+      },
+      "containerId": "ov",
+      "tabId": "ov-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f26",
+      "x": 0,
+      "y": 0,
+      "w": 24,
+      "h": 12,
+      "config": {
+        "displayType": "table",
+        "onClick": {
+          "type": "search",
+          "target": { "mode": "id", "id": "Traces" },
+          "whereLanguage": "sql",
+          "filters": [
+            {
+              "kind": "expressionTemplate",
+              "expression": "SpanName",
+              "template": "{{Endpoint}}"
+            }
+          ]
+        },
+        "configType": "sql",
+        "sqlTemplate": "SELECT\n    SpanName AS Endpoint,\n    count() AS `요청수`,\n    round(count() / greatest(1.0, ({endDateMilliseconds:Int64} - {startDateMilliseconds:Int64}) / 60000.0), 2) AS `요청/분`,\n    round(quantile(0.5)(Duration) / 1e6, 1) AS `P50(ms)`,\n    round(quantile(0.95)(Duration) / 1e6, 1) AS `P95(ms)`,\n    round(quantile(0.99)(Duration) / 1e6, 1) AS `P99(ms)`,\n    round(max(Duration) / 1e6, 1) AS `최대(ms)`,\n    round(sum(Duration) / 1e9, 1) AS `총 소요시간(s)`,\n    countIf(toUInt16OrZero(SpanAttributes['http.response.status_code']) BETWEEN 400 AND 499) AS `4xx`,\n    countIf(toUInt16OrZero(SpanAttributes['http.response.status_code']) >= 500) AS `5xx`,\n    round(100 * countIf(toUInt16OrZero(SpanAttributes['http.response.status_code']) >= 500) / count(), 2) AS `5xx 오류율(%)`\nFROM $__sourceTable\nWHERE Timestamp >= fromUnixTimestamp64Milli({startDateMilliseconds:Int64})\n    AND Timestamp <= fromUnixTimestamp64Milli({endDateMilliseconds:Int64})\n    AND SpanKind = 'Server'\n    AND $__filters\nGROUP BY SpanName\nORDER BY `총 소요시간(s)` DESC\nLIMIT 300",
+        "connection": "Local ClickHouse",
+        "source": "Traces",
+        "name": "엔드포인트별 요약"
+      },
+      "containerId": "ep",
+      "tabId": "ep-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f27",
+      "x": 0,
+      "y": 12,
+      "w": 12,
+      "h": 8,
+      "config": {
+        "name": "총 소요 시간 상위 20",
+        "source": "Traces",
+        "displayType": "bar",
+        "numberFormat": { "output": "duration", "factor": 1e-9 },
+        "select": [
+          {
+            "aggFn": "sum",
+            "aggCondition": "SpanKind = 'Server'",
+            "aggConditionLanguage": "sql",
+            "valueExpression": "Duration",
+            "isDelta": false,
+            "alias": "총 소요 시간"
+          }
+        ],
+        "where": "",
+        "groupBy": "SpanName",
+        "seriesLimit": 20
+      },
+      "containerId": "ep",
+      "tabId": "ep-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f28",
+      "x": 12,
+      "y": 12,
+      "w": 12,
+      "h": 8,
+      "config": {
+        "name": "요청 수 상위 20",
+        "source": "Traces",
+        "displayType": "bar",
+        "numberFormat": {
+          "output": "number",
+          "mantissa": 0,
+          "thousandSeparated": true
+        },
+        "select": [
+          {
+            "aggFn": "count",
+            "aggCondition": "SpanKind = 'Server'",
+            "aggConditionLanguage": "sql",
+            "valueExpression": "",
+            "isDelta": false,
+            "alias": "요청수"
+          }
+        ],
+        "where": "",
+        "groupBy": "SpanName",
+        "seriesLimit": 20
+      },
+      "containerId": "ep",
+      "tabId": "ep-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f29",
+      "x": 0,
+      "y": 20,
+      "w": 12,
+      "h": 8,
+      "config": {
+        "displayType": "table",
+        "onClick": {
+          "type": "search",
+          "target": { "mode": "id", "id": "Traces" },
+          "whereLanguage": "sql",
+          "filters": [
+            {
+              "kind": "expressionTemplate",
+              "expression": "SpanName",
+              "template": "{{Endpoint}}"
+            }
+          ]
+        },
+        "configType": "sql",
+        "sqlTemplate": "SELECT\n    SpanName AS Endpoint,\n    count() AS `요청수`,\n    round(quantile(0.5)(Duration) / 1e6, 1) AS `P50(ms)`,\n    round(quantile(0.95)(Duration) / 1e6, 1) AS `P95(ms)`,\n    round(quantile(0.99)(Duration) / 1e6, 1) AS `P99(ms)`\nFROM $__sourceTable\nWHERE Timestamp >= fromUnixTimestamp64Milli({startDateMilliseconds:Int64})\n    AND Timestamp <= fromUnixTimestamp64Milli({endDateMilliseconds:Int64})\n    AND SpanKind = 'Server'\n    AND $__filters\nGROUP BY SpanName\nHAVING count() >= 20\nORDER BY `P95(ms)` DESC\nLIMIT 20",
+        "connection": "Local ClickHouse",
+        "source": "Traces",
+        "name": "P95 느린 엔드포인트 (20회 이상 호출)"
+      },
+      "containerId": "ep",
+      "tabId": "ep-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f2a",
+      "x": 12,
+      "y": 20,
+      "w": 12,
+      "h": 8,
+      "config": {
+        "displayType": "table",
+        "onClick": {
+          "type": "search",
+          "target": { "mode": "id", "id": "Traces" },
+          "whereLanguage": "sql",
+          "filters": [
+            {
+              "kind": "expressionTemplate",
+              "expression": "SpanName",
+              "template": "{{Endpoint}}"
+            }
+          ]
+        },
+        "configType": "sql",
+        "sqlTemplate": "SELECT\n    SpanName AS Endpoint,\n    count() AS `요청수`,\n    countIf(toUInt16OrZero(SpanAttributes['http.response.status_code']) >= 400) AS `오류수`,\n    countIf(toUInt16OrZero(SpanAttributes['http.response.status_code']) >= 500) AS `5xx`,\n    round(100 * countIf(toUInt16OrZero(SpanAttributes['http.response.status_code']) >= 400) / count(), 2) AS `오류율(%)`\nFROM $__sourceTable\nWHERE Timestamp >= fromUnixTimestamp64Milli({startDateMilliseconds:Int64})\n    AND Timestamp <= fromUnixTimestamp64Milli({endDateMilliseconds:Int64})\n    AND SpanKind = 'Server'\n    AND $__filters\nGROUP BY SpanName\nHAVING count() >= 20 AND `오류수` > 0\nORDER BY `오류율(%)` DESC\nLIMIT 20",
+        "connection": "Local ClickHouse",
+        "source": "Traces",
+        "name": "오류율 높은 엔드포인트 (20회 이상 호출)"
+      },
+      "containerId": "ep",
+      "tabId": "ep-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f2b",
+      "x": 0,
+      "y": 0,
+      "w": 24,
+      "h": 6,
+      "config": {
+        "displayType": "stacked_bar",
+        "numberFormat": {
+          "output": "number",
+          "mantissa": 0,
+          "thousandSeparated": true
+        },
+        "configType": "sql",
+        "sqlTemplate": "SELECT\n    toStartOfInterval(Timestamp, INTERVAL {intervalSeconds:Int64} second) AS ts,\n    SpanAttributes['http.response.status_code'] AS `상태 코드`,\n    count() AS `건수`\nFROM $__sourceTable\nWHERE Timestamp >= fromUnixTimestamp64Milli({startDateMilliseconds:Int64})\n    AND Timestamp <= fromUnixTimestamp64Milli({endDateMilliseconds:Int64})\n    AND SpanKind = 'Server'\n    AND toUInt16OrZero(SpanAttributes['http.response.status_code']) >= 400\n    AND $__filters\nGROUP BY ts, `상태 코드`\nORDER BY ts\nLIMIT 5000",
+        "connection": "Local ClickHouse",
+        "source": "Traces",
+        "name": "4xx / 5xx 발생 추이"
+      },
+      "containerId": "err",
+      "tabId": "err-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f2c",
+      "x": 0,
+      "y": 6,
+      "w": 12,
+      "h": 9,
+      "config": {
+        "displayType": "table",
+        "onClick": {
+          "type": "search",
+          "target": { "mode": "id", "id": "Traces" },
+          "whereLanguage": "sql",
+          "filters": [
+            {
+              "kind": "expressionTemplate",
+              "expression": "SpanName",
+              "template": "{{Endpoint}}"
+            },
+            {
+              "kind": "expressionTemplate",
+              "expression": "SpanAttributes['http.response.status_code']",
+              "template": "{{Status}}"
+            }
+          ]
+        },
+        "configType": "sql",
+        "sqlTemplate": "SELECT\n    SpanName AS Endpoint,\n    SpanAttributes['http.response.status_code'] AS Status,\n    count() AS `건수`,\n    max(Timestamp) AS `마지막 발생`\nFROM $__sourceTable\nWHERE Timestamp >= fromUnixTimestamp64Milli({startDateMilliseconds:Int64})\n    AND Timestamp <= fromUnixTimestamp64Milli({endDateMilliseconds:Int64})\n    AND SpanKind = 'Server'\n    AND toUInt16OrZero(SpanAttributes['http.response.status_code']) >= 400\n    AND $__filters\nGROUP BY Endpoint, Status\nORDER BY `건수` DESC\nLIMIT 100",
+        "connection": "Local ClickHouse",
+        "source": "Traces",
+        "name": "오류 엔드포인트 × 상태 코드"
+      },
+      "containerId": "err",
+      "tabId": "err-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f2d",
+      "x": 12,
+      "y": 6,
+      "w": 12,
+      "h": 9,
+      "config": {
+        "name": "최근 오류 요청",
+        "source": "Traces",
+        "displayType": "search",
+        "select": "",
+        "where": "SpanKind = 'Server' AND toUInt16OrZero(SpanAttributes['http.response.status_code']) >= 400",
+        "whereLanguage": "sql"
+      },
+      "containerId": "err",
+      "tabId": "err-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f2e",
+      "x": 0,
+      "y": 15,
+      "w": 12,
+      "h": 8,
+      "config": {
+        "displayType": "table",
+        "configType": "sql",
+        "sqlTemplate": "SELECT\n    SpanAttributes['client.address'] AS Client,\n    count() AS `실패 건수`,\n    uniqExact(SpanName) AS `대상 엔드포인트 수`,\n    max(Timestamp) AS `마지막 발생`\nFROM $__sourceTable\nWHERE Timestamp >= fromUnixTimestamp64Milli({startDateMilliseconds:Int64})\n    AND Timestamp <= fromUnixTimestamp64Milli({endDateMilliseconds:Int64})\n    AND SpanKind = 'Server'\n    AND toUInt16OrZero(SpanAttributes['http.response.status_code']) IN (401, 403)\n    AND $__filters\nGROUP BY Client\nORDER BY `실패 건수` DESC\nLIMIT 20",
+        "connection": "Local ClickHouse",
+        "source": "Traces",
+        "name": "인증 실패(401/403) 클라이언트 Top 20"
+      },
+      "containerId": "err",
+      "tabId": "err-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f2f",
+      "x": 12,
+      "y": 15,
+      "w": 12,
+      "h": 8,
+      "config": {
+        "displayType": "table",
+        "onClick": {
+          "type": "search",
+          "target": { "mode": "id", "id": "Traces" },
+          "whereLanguage": "sql",
+          "filters": [
+            {
+              "kind": "expressionTemplate",
+              "expression": "SpanName",
+              "template": "{{Endpoint}}"
+            }
+          ]
+        },
+        "configType": "sql",
+        "sqlTemplate": "WITH\n    arrayElement(\n        arrayFirst((attrs, name) -> name = 'exception', Events.Attributes, Events.Name),\n        'exception.message'\n    ) AS exceptionMessage\nSELECT\n    SpanName AS Endpoint,\n    ifNull(coalesce(\n        nullIf(StatusMessage, ''),\n        nullIf(exceptionMessage, '')\n    ), '(메시지 없음)') AS `오류 메시지`,\n    count() AS `건수`,\n    max(Timestamp) AS `마지막 발생`\nFROM $__sourceTable\nWHERE Timestamp >= fromUnixTimestamp64Milli({startDateMilliseconds:Int64})\n    AND Timestamp <= fromUnixTimestamp64Milli({endDateMilliseconds:Int64})\n    AND SpanKind = 'Server'\n    AND toUInt16OrZero(SpanAttributes['http.response.status_code']) >= 500\n    AND $__filters\nGROUP BY Endpoint, `오류 메시지`\nORDER BY `건수` DESC\nLIMIT 50",
+        "connection": "Local ClickHouse",
+        "source": "Traces",
+        "name": "5xx 오류 메시지"
+      },
+      "containerId": "err",
+      "tabId": "err-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f30",
+      "x": 0,
+      "y": 0,
+      "w": 24,
+      "h": 7,
+      "config": {
+        "displayType": "table",
+        "configType": "sql",
+        "sqlTemplate": "SELECT\n    ServiceName AS Service,\n    ResourceAttributes['deployment.environment'] AS Env,\n    count() AS `요청수`,\n    round(quantile(0.5)(Duration) / 1e6, 1) AS `P50(ms)`,\n    round(quantile(0.95)(Duration) / 1e6, 1) AS `P95(ms)`,\n    round(quantile(0.99)(Duration) / 1e6, 1) AS `P99(ms)`,\n    countIf(toUInt16OrZero(SpanAttributes['http.response.status_code']) BETWEEN 400 AND 499) AS `4xx`,\n    countIf(toUInt16OrZero(SpanAttributes['http.response.status_code']) >= 500) AS `5xx`,\n    round(100 * countIf(toUInt16OrZero(SpanAttributes['http.response.status_code']) >= 500) / count(), 2) AS `5xx 오류율(%)`\nFROM $__sourceTable\nWHERE Timestamp >= fromUnixTimestamp64Milli({startDateMilliseconds:Int64})\n    AND Timestamp <= fromUnixTimestamp64Milli({endDateMilliseconds:Int64})\n    AND SpanKind = 'Server'\n    AND $__filters\nGROUP BY Service, Env\nORDER BY `요청수` DESC\nLIMIT 50",
+        "connection": "Local ClickHouse",
+        "source": "Traces",
+        "name": "서비스 / 환경별 요약"
+      },
+      "containerId": "traffic",
+      "tabId": "traffic-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f31",
+      "x": 0,
+      "y": 7,
+      "w": 8,
+      "h": 8,
+      "config": {
+        "displayType": "table",
+        "configType": "sql",
+        "sqlTemplate": "SELECT\n    SpanAttributes['client.address'] AS Client,\n    count() AS `요청수`,\n    round(quantile(0.95)(Duration) / 1e6, 1) AS `P95(ms)`,\n    countIf(toUInt16OrZero(SpanAttributes['http.response.status_code']) >= 400) AS `오류수`\nFROM $__sourceTable\nWHERE Timestamp >= fromUnixTimestamp64Milli({startDateMilliseconds:Int64})\n    AND Timestamp <= fromUnixTimestamp64Milli({endDateMilliseconds:Int64})\n    AND SpanKind = 'Server'\n    AND $__filters\nGROUP BY Client\nORDER BY `요청수` DESC\nLIMIT 20",
+        "connection": "Local ClickHouse",
+        "source": "Traces",
+        "name": "클라이언트 IP Top 20"
+      },
+      "containerId": "traffic",
+      "tabId": "traffic-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f32",
+      "x": 8,
+      "y": 7,
+      "w": 8,
+      "h": 8,
+      "config": {
+        "displayType": "table",
+        "configType": "sql",
+        "sqlTemplate": "SELECT\n    SpanAttributes['user_agent.original'] AS UserAgent,\n    count() AS `요청수`,\n    uniqExact(SpanAttributes['client.address']) AS `클라이언트 수`\nFROM $__sourceTable\nWHERE Timestamp >= fromUnixTimestamp64Milli({startDateMilliseconds:Int64})\n    AND Timestamp <= fromUnixTimestamp64Milli({endDateMilliseconds:Int64})\n    AND SpanKind = 'Server'\n    AND $__filters\nGROUP BY UserAgent\nORDER BY `요청수` DESC\nLIMIT 20",
+        "connection": "Local ClickHouse",
+        "source": "Traces",
+        "name": "User-Agent Top 20"
+      },
+      "containerId": "traffic",
+      "tabId": "traffic-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f33",
+      "x": 16,
+      "y": 7,
+      "w": 8,
+      "h": 8,
+      "config": {
+        "displayType": "table",
+        "configType": "sql",
+        "sqlTemplate": "SELECT\n    SpanName AS Endpoint,\n    count() AS `요청수`,\n    round(sum(toUInt64OrZero(SpanAttributes['http.response.body.size'])) / 1048576.0, 2) AS `총 전송량(MB)`,\n    round(avg(toUInt64OrZero(SpanAttributes['http.response.body.size'])) / 1024.0, 1) AS `평균 크기(KB)`\nFROM $__sourceTable\nWHERE Timestamp >= fromUnixTimestamp64Milli({startDateMilliseconds:Int64})\n    AND Timestamp <= fromUnixTimestamp64Milli({endDateMilliseconds:Int64})\n    AND SpanKind = 'Server'\n    AND $__filters\nGROUP BY Endpoint\nORDER BY `총 전송량(MB)` DESC\nLIMIT 20",
+        "connection": "Local ClickHouse",
+        "source": "Traces",
+        "name": "응답 크기 상위 엔드포인트"
+      },
+      "containerId": "traffic",
+      "tabId": "traffic-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f34",
+      "x": 0,
+      "y": 15,
+      "w": 8,
+      "h": 6,
+      "config": {
+        "displayType": "line",
+        "numberFormat": { "output": "byte", "mantissa": 2 },
+        "configType": "sql",
+        "sqlTemplate": "SELECT\n    toStartOfInterval(Timestamp, INTERVAL {intervalSeconds:Int64} second) AS ts,\n    sum(toUInt64OrZero(SpanAttributes['http.response.body.size'])) AS `전송량`\nFROM $__sourceTable\nWHERE Timestamp >= fromUnixTimestamp64Milli({startDateMilliseconds:Int64})\n    AND Timestamp <= fromUnixTimestamp64Milli({endDateMilliseconds:Int64})\n    AND SpanKind = 'Server'\n    AND $__filters\nGROUP BY ts\nORDER BY ts\nLIMIT 2000",
+        "connection": "Local ClickHouse",
+        "source": "Traces",
+        "name": "응답 전송량 추이"
+      },
+      "containerId": "traffic",
+      "tabId": "traffic-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f35",
+      "x": 8,
+      "y": 15,
+      "w": 8,
+      "h": 6,
+      "config": {
+        "name": "HTTP 프로토콜 버전",
+        "source": "Traces",
+        "displayType": "pie",
+        "numberFormat": {
+          "output": "number",
+          "mantissa": 0,
+          "thousandSeparated": true
+        },
+        "select": [
+          {
+            "aggFn": "count",
+            "aggCondition": "SpanKind = 'Server'",
+            "aggConditionLanguage": "sql",
+            "valueExpression": "",
+            "isDelta": false,
+            "alias": "요청수"
+          }
+        ],
+        "where": "",
+        "groupBy": "SpanAttributes['network.protocol.version']",
+        "seriesLimit": 8
+      },
+      "containerId": "traffic",
+      "tabId": "traffic-t"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f36",
+      "x": 16,
+      "y": 15,
+      "w": 8,
+      "h": 6,
+      "config": {
+        "name": "호스트별 요청",
+        "source": "Traces",
+        "displayType": "pie",
+        "numberFormat": {
+          "output": "number",
+          "mantissa": 0,
+          "thousandSeparated": true
+        },
+        "select": [
+          {
+            "aggFn": "count",
+            "aggCondition": "SpanKind = 'Server'",
+            "aggConditionLanguage": "sql",
+            "valueExpression": "",
+            "isDelta": false,
+            "alias": "요청수"
+          }
+        ],
+        "where": "",
+        "groupBy": "SpanAttributes['server.address']",
+        "seriesLimit": 10
+      },
+      "containerId": "traffic",
+      "tabId": "traffic-t"
+    }
+  ],
+  "filters": [
+    {
+      "id": "6a7d6bf9ac0b876d07d03f37",
+      "type": "QUERY_EXPRESSION",
+      "name": "ServiceName",
+      "expression": "ServiceName",
+      "source": "Traces",
+      "where": "SpanKind = 'Server'",
+      "whereLanguage": "sql"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f38",
+      "type": "QUERY_EXPRESSION",
+      "name": "env",
+      "expression": "ResourceAttributes['deployment.environment']",
+      "source": "Traces",
+      "where": "SpanKind = 'Server'",
+      "whereLanguage": "sql"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f39",
+      "type": "QUERY_EXPRESSION",
+      "name": "Method",
+      "expression": "SpanAttributes['http.request.method']",
+      "source": "Traces",
+      "where": "SpanKind = 'Server'",
+      "whereLanguage": "sql"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f3a",
+      "type": "QUERY_EXPRESSION",
+      "name": "Route",
+      "expression": "SpanAttributes['http.route']",
+      "source": "Traces",
+      "where": "SpanKind = 'Server'",
+      "whereLanguage": "sql"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f3b",
+      "type": "QUERY_EXPRESSION",
+      "name": "Status",
+      "expression": "SpanAttributes['http.response.status_code']",
+      "source": "Traces",
+      "where": "SpanKind = 'Server'",
+      "whereLanguage": "sql"
+    },
+    {
+      "id": "6a7d6bf9ac0b876d07d03f3c",
+      "type": "QUERY_EXPRESSION",
+      "name": "Endpoint",
+      "expression": "SpanName",
+      "source": "Traces",
+      "where": "SpanKind = 'Server'",
+      "whereLanguage": "sql"
+    }
+  ],
+  "containers": [
+    {
+      "id": "ov",
+      "title": "개요",
+      "collapsed": false,
+      "tabs": [{ "id": "ov-t", "title": "개요" }]
+    },
+    {
+      "id": "ep",
+      "title": "엔드포인트",
+      "collapsed": false,
+      "tabs": [{ "id": "ep-t", "title": "엔드포인트" }]
+    },
+    {
+      "id": "err",
+      "title": "오류",
+      "collapsed": false,
+      "tabs": [{ "id": "err-t", "title": "오류" }]
+    },
+    {
+      "id": "traffic",
+      "title": "트래픽 상세",
+      "collapsed": true,
+      "tabs": [{ "id": "traffic-t", "title": "트래픽 상세" }]
+    }
+  ]
+}
