@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: server-name
+  name: default
   labels: 
     app: server-name 
 spec:
