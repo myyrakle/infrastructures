@@ -1,6 +1,6 @@
 kubectl create ns argocd
 wget https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml -O install.yaml​​​
-kubectl apply -n argocd -f install.yaml -server-side --force-conflicts
+kubectl apply -n argocd -f install.yaml --server-side --force-conflicts
 
 kubectl get all -n argocd
 
