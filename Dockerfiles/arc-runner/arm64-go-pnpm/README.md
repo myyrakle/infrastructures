@@ -2,15 +2,18 @@
 - go 1.27
 - pnpm 10
 
-## docker 말기
+## 배포
+말기
 ```bash
 docker build -t ghcr.io/myyrakle/arc-runner:arm-2026.05.27-2 \
   -f arc/Dockerfile .
 ```
 
-## push하기
+push하기
 echo '...' | docker login ghcr.io -u myyrakle --password-stdin
 
+## 사용
+helm 기반 교체
 ```
 helm upgrade arc-runner-set oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set \
   -n arc-runners \
