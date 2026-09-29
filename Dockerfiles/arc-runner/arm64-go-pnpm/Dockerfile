@@ -12,8 +12,8 @@ RUN apt-get update \
         git \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Go
-ARG GO_VERSION=1.25.10
+# Install Go 1.27.1
+ARG GO_VERSION=1.27.1
 RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-arm64.tar.gz" \
     | tar -C /usr/local -xz
 
@@ -46,7 +46,7 @@ RUN FSAM_TMP_DIR="/tmp/fsam-installation" \
     && rm -rf "$FSAM_TMP_DIR" "/tmp/fsam-linux-arm64.zip"
 
 # Install Go CLIs in /usr/local/bin so they remain executable even if GOPATH/bin is missing from PATH
-RUN GOBIN=/usr/local/bin go install github.com/vektra/mockery/v3@v3.6.3 \
+RUN GOBIN=/usr/local/bin go install github.com/vektra/mockery/v3@v3.8.0 \
     && GOBIN=/usr/local/bin go install go.uber.org/mock/mockgen@v0.6.0 \
     && GOBIN=/usr/local/bin go install github.com/swaggo/swag/cmd/swag@v1.16.4 \
     && /usr/local/bin/swag --version
