@@ -23,17 +23,17 @@ ENV GOPATH="/home/runner/go"
 ENV GOMODCACHE="/home/runner/go/pkg/mod"
 ENV GOCACHE="/home/runner/.cache/go-build"
 
-# Install Node.js 20.20.2
+# Install Node.js 24.21.0
 USER root
-RUN curl -fsSL "https://nodejs.org/dist/v20.20.2/node-v20.20.2-linux-arm64.tar.xz" -o /tmp/node.tar.xz \
+RUN curl -fsSL "https://nodejs.org/dist/v24.21.0/node-v24.21.0-linux-arm64.tar.xz" -o /tmp/node.tar.xz \
     && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 \
     && rm /tmp/node.tar.xz \
     && ln -sf /usr/local/bin/node /usr/bin/node \
     && ln -sf /usr/local/bin/npm /usr/bin/npm \
     && ln -sf /usr/local/bin/npx /usr/bin/npx
 
-# Install pnpm 10
-RUN npm install -g pnpm@10
+# Install pnpm 11
+RUN npm install -g pnpm@11
 
 # Install fsam CLI
 ARG FSAM_URL=https://github.com/myyrakle/fast-sam-cli/releases/download/fsam-v0.1.10/fsam-linux-arm64.zip
