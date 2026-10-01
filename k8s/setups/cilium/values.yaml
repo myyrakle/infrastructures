@@ -1,0 +1,62 @@
+# ── kube-proxy 교체 ───────────────────────────────────────────────
+# Egress Gateway 전제조건. BPF 로 Service → Backend 로드밸런싱 수행.
+kubeProxyReplacement: true
+
+# kube-proxy 가 없으므로 Cilium agent 가 API 서버 주소를 직접 알아야 함.
+# mini-pc-1 (control-plane) 의 LAN IP + k3s 기본 포트.
+k8sServiceHost: 192.168.88.202
+k8sServicePort: 6443
+
+# ── CNI 교체 모드 ─────────────────────────────────────────────────
+# 설치 시 기존 flannel CNI 설정 파일 (/etc/cni/net.d/*) 을 Cilium 것으로 교체.
+cni:
+  exclusive: true
+
+# ── IPAM ──────────────────────────────────────────────────────────
+# "kubernetes" = 각 노드의 .spec.podCIDR 을 그대로 사용.
+# 기존 할당 (macmini-1: 10.42.0.0/24, macmini-2: 10.42.1.0/24,
+# mini-pc-1: 10.42.2.0/24) 유지.
+ipam:
+  mode: kubernetes
+
+# ── BPF ───────────────────────────────────────────────────────────
+# masquerade: Pod → 외부 트래픽 SNAT 를 iptables 대신 BPF 로. Egress GW 필수조건.
+# distributedLRU: 1.17+ 템플릿이 nil 체크 안 해서 명시 필요. 기본 off 유지.
+bpf:
+  masquerade: true
+  distributedLRU:
+    enabled: false
+
+# ── Egress Gateway ────────────────────────────────────────────────
+# 기능 플래그. CiliumEgressGatewayPolicy 리소스가 없으면 아무 작업 안 함.
+# 설치 후 서비스별로 policy + pod label 로 opt-in.
+egressGateway:
+  enabled: true
+
+# ── L7 Proxy ──────────────────────────────────────────────────────
+# Hubble L7 메트릭/HTTP NetworkPolicy 용.
+l7Proxy: true
+
+# ── Standalone DNS Proxy ──────────────────────────────────────────
+# 1.17+ 템플릿이 nil 체크 안 해서 명시 필요. 기본 off 유지.
+standaloneDnsProxy:
+  enabled: false
+
+# ── Hubble (관측) ─────────────────────────────────────────────────
+hubble:
+  enabled: true
+  relay:
+    enabled: true
+    # 1.17+ 템플릿이 logOptions.format nil 체크 안 해서 명시 필요.
+    logOptions:
+      format: json
+  ui:
+    enabled: true
+  metrics:
+    enabled:
+      - dns
+      - drop
+      - tcp
+      - flow
+      - port-distribution
+      - icmp
