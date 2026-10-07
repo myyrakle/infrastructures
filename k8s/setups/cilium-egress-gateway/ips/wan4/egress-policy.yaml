@@ -1,0 +1,23 @@
+apiVersion: cilium.io/v2
+kind: CiliumEgressGatewayPolicy
+metadata:
+  name: egress-wan4
+spec:
+  selectors:
+    - podSelector:
+        matchLabels:
+          egress.myyrakle.io/profile: wan4
+
+  destinationCIDRs:
+    - 0.0.0.0/0
+  excludedCIDRs:
+    - 10.42.0.0/16
+    - 10.43.0.0/16
+    - 192.168.88.0/24
+
+  egressGateway:
+    nodeSelector:
+      matchLabels:
+        egress.myyrakle.io/pool: default
+        service-provided.kube-vip.io/egress-wan4.kube-vip-egress: "192.168.88.222"
+    egressIP: 192.168.88.222
