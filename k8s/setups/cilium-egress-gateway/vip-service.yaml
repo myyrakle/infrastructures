@@ -1,0 +1,65 @@
+# kube-vip egress VIP (services mode) — WAN 하나당 LoadBalancer Service 하나 (04-vips/)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kube-vip-egress
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kube-vip-egress-svc
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: kube-vip-egress
+    app.kubernetes.io/instance: svc
+spec:
+  selector:
+    matchLabels:
+      name: kube-vip-egress-svc
+  template:
+    metadata:
+      labels:
+        name: kube-vip-egress-svc
+        app.kubernetes.io/name: kube-vip-egress
+        app.kubernetes.io/instance: svc
+    spec:
+      hostNetwork: true
+      serviceAccountName: kube-vip
+      nodeSelector:
+        egress.myyrakle.io/pool: default
+      tolerations:
+        - operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: kube-vip
+          image: ghcr.io/kube-vip/kube-vip:v1.2.4
+          args: [manager]
+          env:
+            # Node name 은 반드시 downwardAPI 로 넘겨야 kube-vip 가 올바른 k8s 노드에 label 패치 가능
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: vip_nodename
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - { name: vip_arp,              value: "true" }
+            - { name: vip_cidr,             value: "32" }
+            - { name: cp_enable,            value: "false" }
+            - { name: lb_enable,            value: "false" }
+            - { name: svc_enable,           value: "true" }
+            - { name: svc_election,         value: "true" }
+            - { name: svc_namespace,        value: kube-vip-egress }
+            - { name: lb_class_name,        value: myyrakle.io/egress-vip }
+            - { name: lb_class_only,        value: "true" }
+            - { name: lb_class_legacy_handling, value: "false" }
+            - { name: vip_leaseduration,    value: "5" }
+            - { name: vip_renewdeadline,    value: "3" }
+            - { name: vip_retryperiod,      value: "1" }
+            - { name: enable_node_labeling, value: "true" }
+            # hostNetwork 라 :2112 는 control-plane kube-vip 가 이미 점유
+            - { name: prometheus_server,    value: ":2113" }
+          securityContext:
+            capabilities:
+              add: [NET_ADMIN, NET_RAW]
