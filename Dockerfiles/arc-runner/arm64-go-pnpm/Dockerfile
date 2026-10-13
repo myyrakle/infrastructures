@@ -7,6 +7,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         make \
         gcc \
+        libc6-dev \
         curl \
         xz-utils \
         unzip \
