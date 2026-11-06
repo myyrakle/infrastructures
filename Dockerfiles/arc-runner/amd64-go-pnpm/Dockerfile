@@ -48,9 +48,10 @@ RUN FSAM_TMP_DIR="/tmp/fsam-installation" \
     && rm -rf "$FSAM_TMP_DIR" "/tmp/fsam-linux-amd64.zip"
 
 # Install Go CLIs in /usr/local/bin so they remain executable even if GOPATH/bin is missing from PATH
-RUN GOBIN=/usr/local/bin go install github.com/vektra/mockery/v3@v3.8.0 \
-    && GOBIN=/usr/local/bin go install go.uber.org/mock/mockgen@v0.6.0 \
-    && GOBIN=/usr/local/bin go install github.com/swaggo/swag/cmd/swag@v1.16.4 \
+# GOMAXPROCS=1 / GOFLAGS=-p=1 to work around QEMU emulation crashes on cross-arch builds
+RUN GOMAXPROCS=1 GOFLAGS=-p=1 GOBIN=/usr/local/bin go install github.com/vektra/mockery/v3@v3.8.0 \
+    && GOMAXPROCS=1 GOFLAGS=-p=1 GOBIN=/usr/local/bin go install go.uber.org/mock/mockgen@v0.6.0 \
+    && GOMAXPROCS=1 GOFLAGS=-p=1 GOBIN=/usr/local/bin go install github.com/swaggo/swag/cmd/swag@v1.16.4 \
     && /usr/local/bin/swag --version
 
 USER root
